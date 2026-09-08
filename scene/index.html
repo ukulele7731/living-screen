@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Живой листопад</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0f12; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; }
+  #dev {
+    position: fixed; left: 12px; top: 12px; padding: 8px 10px; z-index: 10;
+    font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; color: #e8e4da;
+    background: rgba(20, 22, 26, .62); border-radius: 6px; white-space: pre; pointer-events: none;
+  }
+  #dev[hidden] { display: none; }
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="dev"></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
