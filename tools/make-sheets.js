@@ -34,6 +34,9 @@ const STROKE_COLOR = '#8a8a8a';
 const VEIN_COLOR = '#b8b8b8';
 const MIN_DIST = 4;               // минимум различий (клеток) между любыми двумя кодами меток с учётом поворотов
 const MIN_SIZE_MM = 60;           // предупреждать, если рисунок после укладки уже этого по любой стороне
+const MIN_THICK_MM = 8;           // тоньше этого на бумаге элемент не раскрасить: срез 2.6 мм с каждой стороны
+const THICK_RES_MM = 0.5;         // шаг растра для проверки толщины
+const THIN_MIN_LEN_MM = 5;        // выступ короче этого не считаем элементом (скругление углов)
 const TARGET_POINTS = 100;        // сколько точек хотим в contourModel
 const MAX_POINTS = 150;           // потолок: зубчатым листьям нужно больше точек
 
@@ -45,7 +48,7 @@ const MAX_POINTS = 150;           // потолок: зубчатым листь
 const SPECIES = [
   { name: 'maple',    title: 'Клён',    rotate: 0,  fit: 0.94 },
   { name: 'oak',      title: 'Дуб',     rotate: 80, fit: 0.94 },
-  { name: 'birch',    title: 'Берёза',  rotate: 0,  fit: 0.94 },
+  { name: 'birch',    title: 'Берёза',  rotate: 90, fit: 0.94 },
   { name: 'aspen',    title: 'Осина',   rotate: 0,  fit: 0.94 },
   { name: 'linden',   title: 'Липа',    rotate: 0,  fit: 0.94 },
   { name: 'chestnut', title: 'Каштан',  rotate: 80, fit: 0.90 },
@@ -331,6 +334,122 @@ function shuffled(arr, seed) {           // детерминированная �
 }
 
 // ══════════════════════════════════════════════════════════════════════════
+// Проверка минимальной толщины. Контур растеризуем в мм, делаем
+// морфологическое открытие диском радиуса MIN_THICK_MM/2: всё, что при этом
+// пропало и выступает дальше THIN_MIN_LEN_MM, — элемент тоньше MIN_THICK_MM
+// (черешок, острый кончик, перешеек). Скруглённые углы и зубцы с тупой
+// вершиной пропадают лишь на 1–2 мм и не считаются.
+// ══════════════════════════════════════════════════════════════════════════
+
+// Точное евклидово расстояние (Felzenszwalb–Huttenlocher) до ближайшей
+// «включённой» точки; возвращает расстояния в пикселях.
+function edt(on, W, H) {
+  const INF = 1e12;
+  const f = new Float64Array(Math.max(W, H));
+  const d = new Float64Array(Math.max(W, H));
+  const v = new Int32Array(Math.max(W, H));
+  const z = new Float64Array(Math.max(W, H) + 1);
+  const out = new Float64Array(W * H);
+  for (let i = 0; i < W * H; i++) out[i] = on[i] ? 0 : INF;
+  const dt1 = (n) => {                       // 1D по f → d (квадраты расстояний)
+    let k = 0; v[0] = 0; z[0] = -Infinity; z[1] = Infinity;
+    for (let q = 1; q < n; q++) {
+      let s;
+      for (;;) {
+        const p = v[k];
+        s = ((f[q] + q * q) - (f[p] + p * p)) / (2 * q - 2 * p);
+        if (s <= z[k]) { k--; if (k < 0) { k = 0; break; } } else break;
+      }
+      if (k === 0 && s <= z[0]) { v[0] = q; z[0] = -Infinity; z[1] = Infinity; continue; }
+      k++; v[k] = q; z[k] = s; z[k + 1] = Infinity;
+    }
+    k = 0;
+    for (let q = 0; q < n; q++) {
+      while (z[k + 1] < q) k++;
+      d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+    }
+  };
+  for (let x = 0; x < W; x++) {              // по столбцам
+    for (let y = 0; y < H; y++) f[y] = out[y * W + x];
+    dt1(H);
+    for (let y = 0; y < H; y++) out[y * W + x] = d[y];
+  }
+  for (let y = 0; y < H; y++) {              // по строкам
+    for (let x = 0; x < W; x++) f[x] = out[y * W + x];
+    dt1(W);
+    for (let x = 0; x < W; x++) out[y * W + x] = Math.sqrt(d[x]);
+  }
+  return out;
+}
+
+function rasterize(polyMM, res, pad) {
+  const xs = polyMM.map((p) => p[0]), ys = polyMM.map((p) => p[1]);
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  const W = Math.ceil((Math.max(...xs) + pad - x0) / res), H = Math.ceil((Math.max(...ys) + pad - y0) / res);
+  const inside = new Uint8Array(W * H);
+  const n = polyMM.length;
+  for (let row = 0; row < H; row++) {
+    const y = y0 + (row + 0.5) * res, xsCross = [];
+    for (let i = 0; i < n; i++) {
+      const a = polyMM[i], b = polyMM[(i + 1) % n];
+      if ((a[1] <= y) !== (b[1] <= y)) xsCross.push(a[0] + (y - a[1]) * (b[0] - a[0]) / (b[1] - a[1]));
+    }
+    xsCross.sort((p, q) => p - q);
+    for (let k = 0; k + 1 < xsCross.length; k += 2) {
+      const c0 = Math.max(0, Math.ceil((xsCross[k] - x0) / res - 0.5));
+      const c1 = Math.min(W - 1, Math.floor((xsCross[k + 1] - x0) / res - 0.5));
+      for (let c = c0; c <= c1; c++) inside[row * W + c] = 1;
+    }
+  }
+  return { inside, W, H, x0, y0, res };
+}
+
+function thinElements(polyMM) {
+  const res = THICK_RES_MM, r = MIN_THICK_MM / 2 / res;
+  const { inside, W, H, x0, y0 } = rasterize(polyMM, res, MIN_THICK_MM + 2);
+  const outside = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) outside[i] = inside[i] ? 0 : 1;
+  const dIn = edt(outside, W, H);            // расстояние от точки внутри до края
+  const eroded = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) eroded[i] = inside[i] && dIn[i] >= r ? 1 : 0;
+  const dEr = edt(eroded, W, H);             // расстояние до «толстого тела»
+  const removed = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) removed[i] = inside[i] && dEr[i] > r ? 1 : 0;
+
+  const seen = new Uint8Array(W * H), found = [];
+  for (let start = 0; start < W * H; start++) {
+    if (!removed[start] || seen[start]) continue;
+    const stack = [start], px = [];
+    seen[start] = 1;
+    while (stack.length) {
+      const p = stack.pop(); px.push(p);
+      const x = p % W, y = (p / W) | 0;
+      const nb = [p - 1, p + 1, p - W, p + W];
+      if (x === 0) nb[0] = -1; if (x === W - 1) nb[1] = -1; if (y === 0) nb[2] = -1; if (y === H - 1) nb[3] = -1;
+      for (const q of nb) if (q >= 0 && removed[q] && !seen[q]) { seen[q] = 1; stack.push(q); }
+    }
+    let protrude = 0, thick = 0, sx = 0, sy = 0;
+    for (const p of px) {
+      const out = (dEr[p] - r) * res;                  // насколько точка дальше толстого тела, мм
+      if (out > protrude) protrude = out;
+      if (out >= 3 && dIn[p] * 2 * res > thick) thick = dIn[p] * 2 * res;
+      sx += p % W; sy += (p / W) | 0;
+    }
+    if (protrude < THIN_MIN_LEN_MM) continue;
+    found.push({ thick, protrude, at: [x0 + (sx / px.length + 0.5) * res, y0 + (sy / px.length + 0.5) * res] });
+  }
+  return found.sort((a, b) => b.protrude - a.protrude);
+}
+
+// где на листе элемент: по проекции на жилку черешок→кончик
+function whereOnLeaf(pt, veinMM) {
+  const [a, b] = veinMM;
+  const vx = b[0] - a[0], vy = b[1] - a[1], L2 = vx * vx + vy * vy || 1;
+  const t = ((pt[0] - a[0]) * vx + (pt[1] - a[1]) * vy) / L2;
+  return t < 0.2 ? 'у черешка' : t > 0.8 ? 'у кончика' : 'сбоку';
+}
+
+// ══════════════════════════════════════════════════════════════════════════
 // SVG листа раскраски
 // ══════════════════════════════════════════════════════════════════════════
 
@@ -456,7 +575,15 @@ function main() {
     fs.writeFileSync(path.join(OUT_DIR, sp.name + '.svg'), svg);
     svgs[sp.name] = svg;
 
-    let note = '';
+    const thin = thinElements(printPts);
+    for (const t of thin) {
+      warnings++;
+      console.log(`⚠ ${sp.name}: элемент ${whereOnLeaf(t.at, veinMM)} тоньше ${MIN_THICK_MM} мм — ` +
+        `толщина ${t.thick.toFixed(1)} мм, выступает на ${t.protrude.toFixed(0)} мм ` +
+        `(на листе x=${t.at[0].toFixed(0)}, y=${t.at[1].toFixed(0)} мм)`);
+    }
+
+    let note = thin.length ? `⚠ тонких элементов: ${thin.length}` : '';
     if (size.width < MIN_SIZE_MM) {
       warnings++;
       let best = null;
@@ -464,7 +591,7 @@ function main() {
         const s = leafSizeAt(dense, a, sp.fit);
         if (!best || s.width > best.width) best = { a, ...s };
       }
-      note = `⚠ уже ${MIN_SIZE_MM} мм; лучший угол ${best.a}° → ${best.length.toFixed(0)}×${best.width.toFixed(0)} мм`;
+      note += (note ? '; ' : '') + `⚠ уже ${MIN_SIZE_MM} мм; лучший угол ${best.a}° → ${best.length.toFixed(0)}×${best.width.toFixed(0)} мм`;
     }
     rows.push([sp.name, sp.title, `${sp.rotate}°`, sp.fit, `${dense.length}→${model.length}`,
       `${size.length.toFixed(0)}×${size.width.toFixed(0)} мм`, `${size.boxW.toFixed(0)}×${size.boxH.toFixed(0)} мм`, note]);
