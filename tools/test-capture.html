@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Проверка распознавания листов</title>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 20px; color: #222; background: #fafafa; }
+  h1 { font-size: 18px; margin: 0 0 6px; }
+  p { margin: 4px 0 12px; color: #555; max-width: 900px; }
+  table { border-collapse: collapse; background: #fff; }
+  th, td { border: 1px solid #ddd; padding: 4px 8px; text-align: center; font-size: 13px; }
+  th { background: #f0f0f0; font-weight: 600; }
+  td.name { text-align: left; font-weight: 600; }
+  td.ok { background: #e6f6e6; color: #1a7f1a; }
+  td.bad { background: #fde8e8; color: #b00020; }
+  td.run { background: #fff8dc; }
+  small { color: #888; font-weight: normal; }
+  #summary { font-size: 16px; font-weight: 600; margin: 12px 0; }
+  #summary.bad { color: #b00020; }
+  #summary.ok { color: #1a7f1a; }
+  .gallery { display: flex; flex-wrap: wrap; gap: 10px; }
+  .card { background: #fff; border: 1px solid #ddd; padding: 6px; width: 300px; font-size: 12px; }
+  .card canvas, .card img { display: block; max-width: 100%; margin-top: 4px; background: #eee; }
+  .card .row { display: flex; gap: 6px; }
+  .card .row > * { flex: 1; min-width: 0; }
+  pre { font-size: 12px; background: #fff; border: 1px solid #ddd; padding: 8px; white-space: pre; overflow: auto; }
+</style>
+</head>
+<body>
+<h1>Проверка распознавания: лист раскраски → «фото» → FishCapture.processPhoto</h1>
+<p>Каждый лист из <code>assets/coloring/sheets.js</code> рисуется в canvas, внутрь контура кладётся случайная «раскраска»,
+затем лист снимается «телефоном»: перспективный наклон, поворот, неровный свет, шум, размытие, а в сценарии
+«домашний принтер» — ещё серые метки и желтоватая бумага. Результат сравнивается с ожидаемым видом.</p>
+<table id="t"></table>
+<div id="summary">Считаю…</div>
+<pre id="report" hidden></pre>
+<h2 style="font-size:16px">Что видел capture.js (сценарий «ровно»)</h2>
+<div class="gallery" id="gallery"></div>
+<h2 style="font-size:16px">Провалы</h2>
+<div class="gallery" id="fails"><span style="color:#888">нет</span></div>
+
+<script src="../vendor/paper-aquarium/capture.js"></script>
+<script src="../assets/coloring/sheets.js"></script>
+<script>
+(async function () {
+  'use strict';
+  const { manifest, svg: SVGS } = window.LEAF_SHEETS;
+  const SHEET = manifest.sheet;
+  const PX = 5;                                  // px/мм при рендере листа
+  const SW = Math.round(SHEET.w * PX), SH = Math.round(SHEET.h * PX);
+  const PHOTO_W = 1600, PHOTO_H = 1200;
+
+  // tilt — наклон плоскости листа к камере (°), roll — поворот в плоскости (°),
+  // noise — σ шума, blur — px, light — неровность освещения (доля),
+  // paper/ink — цвет бумаги и цвет «чёрного» (домашний принтер, слабый тонер)
+  const SCENARIOS = [
+    { id: 'flat',   label: 'Ровно',                       tilt: 0,  roll: 2,    noise: 4,  blur: 0,   light: 0.08 },
+    { id: 'tilt15', label: 'Наклон 15°',                  tilt: 15, roll: 10,   noise: 6,  blur: 0.5, light: 0.12 },
+    { id: 'tilt25', label: 'Наклон 25° + поворот 20°',    tilt: 25, roll: 20,   noise: 6,  blur: 0.5, light: 0.15 },
+    { id: 'noisy',  label: '25° + шум + размытие',        tilt: 25, roll: -15,  noise: 14, blur: 1.4, light: 0.15 },
+    { id: 'upside', label: 'Вверх ногами, наклон 10°',    tilt: 10, roll: 180,  noise: 6,  blur: 0.5, light: 0.12 },
+    { id: 'home',   label: 'Домашний принтер: серые метки, жёлтая бумага, неровный свет',
+                                                          tilt: 20, roll: -8,   noise: 9,  blur: 0.9, light: 0.3,
+                                                          paper: [247, 238, 205], ink: [78, 74, 70] }
+  ];
+
+  // ── детерминированный генератор случайных чисел ──
+  function rng(seed) {
+    let s = seed >>> 0;
+    return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
+  }
+
+  // ── линал: гомография по 4 парам точек (DLT, 8×8 Гаусс) ──
+  function solve(M, b) {
+    const n = b.length, A = M.map((row, i) => row.concat([b[i]]));
+    for (let c = 0; c < n; c++) {
+      let piv = c;
+      for (let r = c + 1; r < n; r++) if (Math.abs(A[r][c]) > Math.abs(A[piv][c])) piv = r;
+      [A[c], A[piv]] = [A[piv], A[c]];
+      for (let r = 0; r < n; r++) {
+        if (r === c) continue;
+        const f = A[r][c] / A[c][c];
+        for (let k = c; k <= n; k++) A[r][k] -= f * A[c][k];
+      }
+    }
+    return A.map((row, i) => row[n] / row[i]);
+  }
+  function homography(src, dst) {
+    const M = [], b = [];
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = src[i], [X, Y] = dst[i];
+      M.push([x, y, 1, 0, 0, 0, -X * x, -X * y]); b.push(X);
+      M.push([0, 0, 0, x, y, 1, -Y * x, -Y * y]); b.push(Y);
+    }
+    return solve(M, b).concat([1]);
+  }
+  function apply(h, x, y) {
+    const d = h[6] * x + h[7] * y + h[8];
+    return [(h[0] * x + h[1] * y + h[2]) / d, (h[3] * x + h[4] * y + h[5]) / d];
+  }
+
+  // ── лист как картинка ──
+  const imgCache = {};
+  function loadSheet(kind) {
+    if (imgCache[kind]) return imgCache[kind];
+    imgCache[kind] = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error('не загрузился SVG ' + kind));
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(SVGS[kind])));
+    });
+    return imgCache[kind];
+  }
+
+  const COLORS = ['#e53935', '#fb8c00', '#fdd835', '#7cb342', '#1e88e5', '#8e24aa', '#6d4c41', '#00acc1', '#d81b60'];
+
+  // лист в px (SW×SH) с «детской раскраской» внутри контура
+  async function renderSheet(fish, sc, seed) {
+    const img = await loadSheet(fish.name);
+    const cv = document.createElement('canvas');
+    cv.width = SW; cv.height = SH;
+    const ctx = cv.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, SW, SH);
+
+    const st = fish.sheetTransform;
+    const toPx = (p) => [(st.ox + st.scale * p[0]) * PX, (st.oy - st.scale * p[1]) * PX];
+    const rnd = rng(seed);
+    ctx.save();
+    ctx.beginPath();
+    fish.contourModel.forEach((p, i) => { const q = toPx(p); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
+    ctx.closePath();
+    ctx.clip();
+    // заливка «карандашом» — светлая, с просветами бумаги
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = COLORS[Math.floor(rnd() * COLORS.length)];
+    ctx.fillRect(0, 0, SW, SH);
+    // фломастер: толстые штрихи
+    ctx.globalAlpha = 0.85;
+    ctx.lineCap = 'round';
+    const bz = fish.bboxModel.z, by = fish.bboxModel.y;
+    for (let i = 0; i < 28; i++) {
+      ctx.strokeStyle = COLORS[Math.floor(rnd() * COLORS.length)];
+      ctx.lineWidth = 12 + rnd() * 30;
+      const a = toPx([bz[0] + rnd() * (bz[1] - bz[0]), by[0] + rnd() * (by[1] - by[0])]);
+      const b = toPx([bz[0] + rnd() * (bz[1] - bz[0]), by[0] + rnd() * (by[1] - by[0])]);
+      ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+    }
+    ctx.restore();
+
+    if (sc.paper || sc.ink) {          // бумага не белая, тонер не чёрный: линейно пережимаем диапазон
+      const paper = sc.paper || [255, 255, 255], ink = sc.ink || [0, 0, 0];
+      const im = ctx.getImageData(0, 0, SW, SH), d = im.data;
+      for (let i = 0; i < d.length; i += 4) {
+        for (let c = 0; c < 3; c++) d[i + c] = ink[c] + (paper[c] - ink[c]) * d[i + c] / 255;
+      }
+      ctx.putImageData(im, 0, 0);
+    }
+    return cv;
+  }
+
+  // «фото»: перспектива, фон стола, освещение, шум, размытие
+  function shoot(sheet, sc, seed) {
+    const rnd = rng(seed ^ 0x9e3779b9);
+    const rad = (d) => d * Math.PI / 180;
+    const tilt = rad(sc.tilt), yaw = rad(sc.tilt * 0.7), roll = rad(sc.roll);
+    // углы листа в мм относительно центра → 3D поворот → проекция
+    const corners = [[-SHEET.w / 2, -SHEET.h / 2], [SHEET.w / 2, -SHEET.h / 2], [SHEET.w / 2, SHEET.h / 2], [-SHEET.w / 2, SHEET.h / 2]];
+    const D = 650;                                     // расстояние до камеры, мм
+    const proj = corners.map(([x, y]) => {
+      // поворот в плоскости
+      let X = x * Math.cos(roll) - y * Math.sin(roll), Y = x * Math.sin(roll) + y * Math.cos(roll), Z = 0;
+      // наклон вокруг X
+      let Y2 = Y * Math.cos(tilt) - Z * Math.sin(tilt), Z2 = Y * Math.sin(tilt) + Z * Math.cos(tilt);
+      Y = Y2; Z = Z2;
+      // наклон вокруг Y
+      const X2 = X * Math.cos(yaw) + Z * Math.sin(yaw), Z3 = -X * Math.sin(yaw) + Z * Math.cos(yaw);
+      X = X2; Z = Z3;
+      const k = D / (D + Z);
+      return [X * k, Y * k];
+    });
+    const xs = proj.map((p) => p[0]), ys = proj.map((p) => p[1]);
+    const bw = Math.max(...xs) - Math.min(...xs), bh = Math.max(...ys) - Math.min(...ys);
+    const s = 0.86 * Math.min(PHOTO_W / bw, PHOTO_H / bh);
+    const cx = (Math.max(...xs) + Math.min(...xs)) / 2, cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+    const dst = proj.map((p) => [PHOTO_W / 2 + (p[0] - cx) * s, PHOTO_H / 2 + (p[1] - cy) * s]);
+    const src = [[0, 0], [SW, 0], [SW, SH], [0, SH]];
+    const Hinv = homography(dst, src);                 // фото → лист
+
+    const sctx = sheet.getContext('2d');
+    const sd = sctx.getImageData(0, 0, SW, SH).data;
+    const photo = document.createElement('canvas');
+    photo.width = PHOTO_W; photo.height = PHOTO_H;
+    const pctx = photo.getContext('2d', { willReadFrequently: true });
+    const im = pctx.createImageData(PHOTO_W, PHOTO_H), d = im.data;
+    const lightDir = rnd() * Math.PI * 2;
+    for (let y = 0; y < PHOTO_H; y++) {
+      for (let x = 0; x < PHOTO_W; x++) {
+        const o = (y * PHOTO_W + x) * 4;
+        const [u, v] = apply(Hinv, x + 0.5, y + 0.5);
+        let r, g, b;
+        if (u >= 0 && v >= 0 && u < SW - 1 && v < SH - 1) {
+          const ui = u | 0, vi = v | 0, fu = u - ui, fv = v - vi;
+          const i00 = (vi * SW + ui) * 4, i10 = i00 + 4, i01 = i00 + SW * 4, i11 = i01 + 4;
+          const lerp = (c) => (sd[i00 + c] * (1 - fu) + sd[i10 + c] * fu) * (1 - fv) + (sd[i01 + c] * (1 - fu) + sd[i11 + c] * fu) * fv;
+          r = lerp(0); g = lerp(1); b = lerp(2);
+        } else {                                       // стол
+          const t = 118 + (rnd() - 0.5) * 10;
+          r = t; g = t * 0.72; b = t * 0.5;
+        }
+        // неровный свет: градиент по направлению + виньетка
+        const nx = x / PHOTO_W - 0.5, ny = y / PHOTO_H - 0.5;
+        const grad = 1 + sc.light * (nx * Math.cos(lightDir) + ny * Math.sin(lightDir)) * 2;
+        const vign = 1 - sc.light * 0.5 * (nx * nx + ny * ny) * 2;
+        const L = grad * vign;
+        // шум (сумма двух равномерных ≈ треугольное распределение)
+        const n = (rnd() + rnd() - 1) * sc.noise * 1.7;
+        d[o] = r * L + n; d[o + 1] = g * L + n; d[o + 2] = b * L + n; d[o + 3] = 255;
+      }
+    }
+    pctx.putImageData(im, 0, 0);
+    if (sc.blur > 0) {
+      const out = document.createElement('canvas');
+      out.width = PHOTO_W; out.height = PHOTO_H;
+      const octx = out.getContext('2d');
+      octx.filter = `blur(${sc.blur}px)`;
+      octx.drawImage(photo, 0, 0);
+      return out;
+    }
+    return photo;
+  }
+
+  // ── таблица ──
+  const table = document.getElementById('t');
+  const head = document.createElement('tr');
+  head.innerHTML = '<th>вид</th>' + SCENARIOS.map((s) => `<th>${s.label}</th>`).join('');
+  table.appendChild(head);
+  const cells = {};
+  manifest.fish.forEach((f) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="name">${f.title} <small>${f.name}</small></td>`;
+    SCENARIOS.forEach((s) => {
+      const td = document.createElement('td');
+      td.textContent = '·';
+      cells[f.name + '/' + s.id] = td;
+      tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+
+  function thumb(canvas, w) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = Math.round(canvas.height * w / canvas.width);
+    c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+    return c;
+  }
+  function card(title, nodes) {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = `<b>${title}</b>`;
+    nodes.forEach((n) => el.appendChild(n));
+    return el;
+  }
+
+  // ── прогон ──
+  const results = [];
+  let fails = 0, done = 0;
+  const total = manifest.fish.length * SCENARIOS.length;
+  const gallery = document.getElementById('gallery');
+  const failsEl = document.getElementById('fails');
+  const summary = document.getElementById('summary');
+  let seed = 1;
+
+  for (const fish of manifest.fish) {
+    for (const sc of SCENARIOS) {
+      const td = cells[fish.name + '/' + sc.id];
+      td.className = 'run'; td.textContent = '…';
+      const s = seed++;
+      const sheet = await renderSheet(fish, sc, s);
+      const photo = shoot(sheet, sc, s);
+      const t0 = performance.now();
+      let ok = false, msg = '', res = null;
+      try {
+        res = await FishCapture.processPhoto(photo, manifest);
+        ok = res.kind === fish.name;
+        msg = ok ? '' : `распознан как ${res.kind}`;
+      } catch (e) {
+        msg = String(e.message || e);
+      }
+      const ms = Math.round(performance.now() - t0);
+      results.push({ kind: fish.name, scenario: sc.id, ok, ms, msg });
+      td.className = ok ? 'ok' : 'bad';
+      td.innerHTML = (ok ? '✓' : '✗') + ` <small>${ms} мс</small>`;
+      td.title = msg;
+      if (!ok) {
+        fails++;
+        if (fails === 1) failsEl.innerHTML = '';
+        failsEl.appendChild(card(`${fish.title} · ${sc.label}: ${msg}`, [thumb(photo, 288)]));
+      }
+      if (sc.id === 'flat') {
+        const nodes = [thumb(photo, 288)];
+        if (res) {
+          const row = document.createElement('div'); row.className = 'row';
+          const t = new Image(); t.src = res.texture;
+          const p = new Image(); p.src = res.preview;
+          row.appendChild(t); row.appendChild(p);
+          nodes.push(row);
+        }
+        gallery.appendChild(card(fish.title, nodes));
+      }
+      done++;
+      summary.textContent = `Выполнено ${done} из ${total}, провалов: ${fails}`;
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+
+  summary.textContent = `Провалов: ${fails} из ${total}`;
+  summary.className = fails ? 'bad' : 'ok';
+
+  // текстовый отчёт (для headless-прогона)
+  const w0 = Math.max(...manifest.fish.map((f) => f.title.length)) + 2;
+  const lines = [];
+  lines.push(''.padEnd(w0) + SCENARIOS.map((s, i) => `[${i + 1}]`.padStart(11)).join(''));
+  for (const f of manifest.fish) {
+    lines.push(f.title.padEnd(w0) + SCENARIOS.map((s) => {
+      const r = results.find((x) => x.kind === f.name && x.scenario === s.id);
+      return `${r.ok ? '✓' : '✗'} ${r.ms} мс`.padStart(11);
+    }).join(''));
+  }
+  lines.push('');
+  SCENARIOS.forEach((s, i) => lines.push(`[${i + 1}] ${s.label}`));
+  lines.push('');
+  results.filter((r) => !r.ok).forEach((r) => lines.push(`✗ ${r.kind} / ${r.scenario}: ${r.msg}`));
+  lines.push(`Провалов: ${fails} из ${total}`);
+  const report = lines.join('\n');
+  document.getElementById('report').textContent = report;
+  document.getElementById('report').hidden = false;
+  window.__results = { results, fails, total, done: true };
+  window.__report = report;
+})().catch((e) => {
+  document.getElementById('summary').textContent = 'Ошибка: ' + (e.message || e);
+  document.getElementById('summary').className = 'bad';
+  window.__results = { error: String(e.message || e), done: true };
+  window.__report = 'Ошибка: ' + (e.message || e);
+});
+</script>
+</body>
+</html>
