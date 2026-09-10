@@ -133,8 +133,9 @@ export function makeLeafMaterial(opts: LeafMaterialOptions): LeafMaterial {
           // просвет: свет из-за листа проходит сквозь; у жилки и черешка лист толще
           vec3 L = directionalLights[0].direction;
           float back = clamp(dot(-normal, L), 0.0, 1.0);
-          float thickV = mix(1.0, 0.35, smoothstep(0.0, 0.16, abs(vAux.y)));
-          thickV = max(thickV, 1.0 - smoothstep(0.0, 0.2, vAux.z));
+          // жилка — узкая (≈4% ширины) и мягкая, у черешка лист чуть толще
+          float thickV = mix(0.68, 0.35, smoothstep(0.0, 0.045, abs(vAux.y)));
+          thickV = max(thickV, mix(0.68, 0.35, smoothstep(0.0, 0.12, vAux.z)));
           float thin = 1.0 - thickV;
           vec3 trans = diffuseColor.rgb * directionalLights[0].color * back * thin * translucency;
           reflectedLight.indirectDiffuse += trans;

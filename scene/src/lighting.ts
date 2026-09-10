@@ -18,12 +18,12 @@ export function makeLighting(season: Season): Lighting {
   const sunDir = sunDirection(season.sun.azimuth, season.sun.elevation);
 
   const sun = new THREE.DirectionalLight(new THREE.Color(season.sun.color), season.sun.intensity);
-  sun.target.position.set(0, 3, -12);
+  sun.target.position.set(0, 1.5, -7);
   sun.position.copy(sun.target.position).addScaledVector(sunDir, 90);
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   const cam = sun.shadow.camera;
-  cam.left = -22; cam.right = 22; cam.top = 22; cam.bottom = -22;
+  cam.left = -14; cam.right = 14; cam.top = 14; cam.bottom = -14;
   cam.near = 20; cam.far = 200;
   sun.shadow.bias = -0.0003;
   sun.shadow.normalBias = 0.03;

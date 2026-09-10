@@ -8,6 +8,7 @@ import { season } from './config';
 import { makeLighting } from './lighting';
 import { makeMidTrees } from './midTrees';
 import { makeBranchLeaves } from './branch-leaves';
+import { makeTestLeaf } from './test-leaf';
 import { makeGround } from './ground';
 import { loadBackdrop } from './backdrop';
 import { makeComposite } from './composite';
@@ -52,11 +53,25 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
 
   const lighting = makeLighting(season);
   scene.add(lighting.group);
-  const trees = makeMidTrees(season);
-  scene.add(trees.group);
-  const branchLeaves = makeBranchLeaves(season, trees.tips);
-  for (const b of branchLeaves.batches) scene.add(b.mesh);
+  // Ветка среднего плана и листва на ней отложены (midTrees.enabled): код остаётся, в сцену не попадает.
+  const updaters: ((time: number) => void)[] = [];
+  if (season.midTrees.enabled) {
+    const trees = makeMidTrees(season);
+    scene.add(trees.group);
+    const branchLeaves = makeBranchLeaves(season, trees.tips);
+    for (const b of branchLeaves.batches) scene.add(b.mesh);
+    updaters.push((t) => branchLeaves.update(t));
+  }
   scene.add(makeGround(season));
+  if (season.testLeaf.enabled) {
+    // размещение по точке экрана требует актуальных матриц камеры и пропорций экрана
+    camera.aspect = (canvas.clientWidth || window.innerWidth) / (canvas.clientHeight || window.innerHeight);
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld(true);
+    const leaf = await makeTestLeaf(season, camera, import.meta.env.BASE_URL);
+    scene.add(leaf.mesh);
+    updaters.push((t) => leaf.update(t));
+  }
 
   // ── постобработка: 3D-слой → тонмаппинг и sRGB → композит с задником ──
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
@@ -88,7 +103,7 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
   const renderFrame = (dt: number) => {
     time += dt;
     composite.update(time);
-    branchLeaves.update(time);
+    for (const u of updaters) u(time);
     renderer.info.reset();
     composer.render();
   };

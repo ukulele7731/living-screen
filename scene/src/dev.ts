@@ -22,7 +22,7 @@ export function makeDevOverlay(el: HTMLElement): DevOverlay {
           const r = renderer.info.render;
           const size = renderer.getSize(new THREE.Vector2());
           el.textContent =
-            `${fps.toFixed(0)} fps   ${ms.toFixed(1)} ms\n` +
+            `${fps.toFixed(0)} fps   кадр ${(1000 / Math.max(fps, 0.01)).toFixed(1)} мс   JS ${ms.toFixed(1)} мс\n` +
             `draw calls ${r.calls}   triangles ${r.triangles.toLocaleString('ru')}\n` +
             `${size.x}×${size.y} @${renderer.getPixelRatio().toFixed(2)}   [H] скрыть`;
         }

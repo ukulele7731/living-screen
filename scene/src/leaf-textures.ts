@@ -2,7 +2,8 @@
 // осеннего парка — для листвы на ветке и для тестов, пока нет детских
 // рисунков. Текстура покрывает bbox вида (как у capture.js), несколько
 // цветовых вариантов сложены столбиком в один атлас: iUvRect выбирает вариант.
-// Плюс карта нормалей из яркости — штрихи читаются как рельеф.
+// Жилки — не линии в текстуре, а рельеф в карте нормалей (бугор 0.3 мм),
+// читаются по свету. Плюс слабый рельеф штрихов из яркости.
 import * as THREE from 'three';
 import type { LeafShape } from './leaf-shapes';
 import { rng, makeCanvas, canvasTexture, makeNoise2D, hexToRgb, mixRgb } from './util';
@@ -28,21 +29,73 @@ function pointInPolygon(p: P, poly: P[]): boolean {
   return inside;
 }
 
-/** Карта нормалей из яркости (Собель). Строится один раз на текстуру. */
-export function normalMapFromCanvas(src: HTMLCanvasElement, strength = 2.0): THREE.CanvasTexture {
+/** Рельеф жилок в мм: главная жилка — бугор высотой mainMm и шириной ~3.5% ширины листа
+ *  (на половине высоты), боковые — тоньше и ниже. Возвращает карту высот в мм. */
+export function veinHeightMm(shape: LeafShape, w: number, h: number, leafLongMm: number, mainMm = 0.3): Float32Array {
+  const { bbox, vein, contour } = shape;
+  const bw = bbox.x1 - bbox.x0, bh = bbox.y1 - bbox.y0;
+  const unitMm = leafLongMm;                                  // 1 единица модели = leafLongMm мм
+  let maxLat = 0;
+  const vb = vein[0], vt = vein[1];
+  const ax = vt[0] - vb[0], ay = vt[1] - vb[1], vl = Math.hypot(ax, ay) || 1;
+  const ux = ax / vl, uy = ay / vl, px = -uy, py = ux;
+  for (const c of contour) maxLat = Math.max(maxLat, Math.abs((c[0] - vb[0]) * px + (c[1] - vb[1]) * py));
+  const widthUnits = maxLat * 2;
+  const sigmaMain = widthUnits * 0.015, sigmaSide = widthUnits * 0.008;   // σ гаусса; ширина на полувысоте ≈ 1.67σ·2
+  // боковые жилки — как и раньше, из точки на главной жилке под углом к кончику
+  const r = rng(shape.name.length * 17);
+  const sides: { sx: number; sy: number; dx: number; dy: number; len: number }[] = [];
+  const nSide = 6 + Math.floor(r() * 3);
+  for (let i = 1; i <= nSide; i++) {
+    const t = i / (nSide + 1);
+    const sx = vb[0] + ax * t, sy = vb[1] + ay * t;
+    for (const side of [-1, 1]) {
+      const ang = (0.55 + r() * 0.25) * side;
+      const dx = ux * Math.cos(ang) - uy * Math.sin(ang), dy = ux * Math.sin(ang) + uy * Math.cos(ang);
+      let len = 0;
+      for (let k = 0.01; k < 0.6; k += 0.01) { if (!pointInPolygon([sx + dx * k, sy + dy * k], contour)) break; len = k; }
+      if (len > 0.03) sides.push({ sx, sy, dx, dy, len: len * 0.92 });
+    }
+  }
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const mx = bbox.x0 + (x + 0.5) / w * bw, my = bbox.y1 - (y + 0.5) / h * bh;
+      const rx = mx - vb[0], ry = my - vb[1];
+      const t = (rx * ux + ry * uy) / vl, sLat = rx * px + ry * py;
+      let hgt = 0;
+      if (t > -0.02 && t < 1.0) hgt += mainMm * (1 - 0.5 * t) * Math.exp(-(sLat * sLat) / (sigmaMain * sigmaMain));
+      for (const v of sides) {
+        const qx = mx - v.sx, qy = my - v.sy;
+        const along = qx * v.dx + qy * v.dy;
+        if (along < 0 || along > v.len) continue;
+        const across = qx * -v.dy + qy * v.dx;
+        hgt += mainMm * 0.4 * (1 - along / v.len * 0.6) * Math.exp(-(across * across) / (sigmaSide * sigmaSide));
+      }
+      out[y * w + x] = hgt;
+    }
+  }
+  void unitMm;
+  return out;
+}
+
+/** Карта нормалей: рельеф жилок (мм, физический масштаб) + слабый рельеф штрихов из яркости. */
+export function normalMapFromCanvas(src: HTMLCanvasElement, lumStrength: number, veins?: { mm: Float32Array; mmPerPx: number }): THREE.CanvasTexture {
   const w = src.width, h = src.height;
   const sctx = src.getContext('2d')!;
   const d = sctx.getImageData(0, 0, w, h).data;
-  const lum = new Float32Array(w * h);
-  for (let i = 0; i < w * h; i++) lum[i] = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255;
+  const hgt = new Float32Array(w * h);                        // высота в пикселях
+  for (let i = 0; i < w * h; i++) {
+    const lum = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255;
+    hgt[i] = lum * lumStrength + (veins ? veins.mm[i] / veins.mmPerPx : 0);
+  }
   const [canvas, ctx] = makeCanvas(w, h);
   const out = ctx.createImageData(w, h);
-  const at = (x: number, y: number) => lum[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
+  const at = (x: number, y: number) => hgt[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const gx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1)) - (at(x - 1, y - 1) + 2 * at(x - 1, y) + at(x - 1, y + 1));
-      const gy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1)) - (at(x - 1, y - 1) + 2 * at(x, y - 1) + at(x + 1, y - 1));
-      let nx = -gx * strength, ny = gy * strength, nz = 1;   // ny: canvas y вниз, uv y вверх
+      const gx = (at(x + 1, y) - at(x - 1, y)) / 2, gy = (at(x, y + 1) - at(x, y - 1)) / 2;
+      let nx = -gx, ny = gy, nz = 1;                          // canvas y вниз, uv y вверх
       const l = Math.hypot(nx, ny, nz);
       nx /= l; ny /= l; nz /= l;
       const o = (y * w + x) * 4;
@@ -53,8 +106,22 @@ export function normalMapFromCanvas(src: HTMLCanvasElement, strength = 2.0): THR
   return canvasTexture(canvas, false);
 }
 
+/** Атлас из готовой картинки (рисунок ребёнка из capture.js): один вариант, uv на весь кадр. */
+export function atlasFromImage(img: HTMLImageElement, shape: LeafShape, leafLongMm: number): LeafAtlas {
+  const w = Math.min(1024, img.naturalWidth), h = Math.round(w * img.naturalHeight / img.naturalWidth);
+  const [canvas, ctx] = makeCanvas(w, h);
+  ctx.drawImage(img, 0, 0, w, h);
+  const map = canvasTexture(canvas);
+  map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
+  map.anisotropy = 8;
+  const mmPerPx = leafLongMm / Math.max(w, h);
+  const normalMap = normalMapFromCanvas(canvas, 0.35, { mm: veinHeightMm(shape, w, h, leafLongMm), mmPerPx });
+  normalMap.wrapS = normalMap.wrapT = THREE.ClampToEdgeWrapping;
+  return { map, normalMap, variants: 1, rect: () => [0, 0, 1, 1] };
+}
+
 /** Нарисованный лист: градиент от черешка к кончику, пятна, жилки, тёмный край. */
-export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: number, cellW = 512): LeafAtlas {
+export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: number, leafLongMm = 300, cellW = 512): LeafAtlas {
   const cellH = Math.round(cellW / shape.aspect);
   const variants = palettes.length;
   const [canvas, ctx] = makeCanvas(cellW, cellH * variants);
@@ -71,6 +138,7 @@ export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: 
     const r = rng(seed + row * 101);
     const img = ctx.createImageData(cellW, cellH);
     const cBase = hexToRgb(pal.base), cMid = hexToRgb(pal.mid), cTip = hexToRgb(pal.tip), cEdge = hexToRgb(pal.edge);
+    void pal.vein;
     const off = r() * 50;
     for (let y = 0; y < cellH; y++) {
       for (let x = 0; x < cellW; x++) {
@@ -92,54 +160,26 @@ export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: 
     }
     ctx.putImageData(img, 0, row * cellH);
 
-    // край: тёмная бурая кайма внутри контура (широкая мягкая обводка, обрезанная контуром)
+    // лёгкое потемнение к самому краю (как у подсыхающего листа) — мягкое и слабое
     ctx.save();
     ctx.beginPath();
     contour.forEach((p, i) => { const q = toPx(p, row); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); });
     ctx.closePath();
     ctx.clip();
-    ctx.strokeStyle = `rgba(${cEdge[0] | 0},${cEdge[1] | 0},${cEdge[2] | 0},0.55)`;
-    ctx.lineWidth = cellW * 0.05;
+    ctx.strokeStyle = `rgba(${cEdge[0] | 0},${cEdge[1] | 0},${cEdge[2] | 0},0.06)`;
+    ctx.lineWidth = cellW * 0.08;
     ctx.stroke();
-    ctx.strokeStyle = `rgba(${cEdge[0] | 0},${cEdge[1] | 0},${cEdge[2] | 0},0.5)`;
-    ctx.lineWidth = cellW * 0.014;
-    ctx.stroke();
-
-    // жилки: главная и боковые, к кончику тоньше
-    const cv = hexToRgb(pal.vein);
-    ctx.strokeStyle = `rgba(${cv[0] | 0},${cv[1] | 0},${cv[2] | 0},0.6)`;
-    ctx.lineCap = 'round';
-    const b = toPx(vb, row), tp = toPx(vt, row);
-    ctx.lineWidth = cellW * 0.007;
-    ctx.beginPath(); ctx.moveTo(b[0], b[1]); ctx.lineTo(tp[0], tp[1]); ctx.stroke();
-    const nSide = 6 + Math.floor(r() * 3);
-    for (let i = 1; i <= nSide; i++) {
-      const t = i / (nSide + 1);
-      const sx = vb[0] + ax * t, sy = vb[1] + ay * t;
-      for (const side of [-1, 1]) {
-        const ang = (0.55 + r() * 0.25) * side;
-        const dx = ux * Math.cos(ang) - uy * Math.sin(ang), dy = ux * Math.sin(ang) + uy * Math.cos(ang);
-        // идём до контура
-        let len = 0;
-        for (let k = 0.01; k < 0.6; k += 0.01) {
-          if (!pointInPolygon([sx + dx * k, sy + dy * k], contour)) break;
-          len = k;
-        }
-        if (len < 0.03) continue;
-        const e = toPx([sx + dx * len * 0.92, sy + dy * len * 0.92], row);
-        const s = toPx([sx, sy], row);
-        const c1 = toPx([sx + dx * len * 0.5 + uy * 0.02 * side, sy + dy * len * 0.5 - ux * 0.02 * side], row);
-        ctx.lineWidth = cellW * 0.0045 * (1 - t * 0.5);
-        ctx.beginPath(); ctx.moveTo(s[0], s[1]); ctx.quadraticCurveTo(c1[0], c1[1], e[0], e[1]); ctx.stroke();
-      }
-    }
     ctx.restore();
   });
 
   const map = canvasTexture(canvas);
   map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
   map.anisotropy = 8;
-  const normalMap = normalMapFromCanvas(canvas, 1.6);
+  // рельеф жилок один на все варианты: карта высот ячейки повторяется по строкам
+  const cellMm = veinHeightMm(shape, cellW, cellH, leafLongMm);
+  const allMm = new Float32Array(cellW * cellH * variants);
+  for (let v = 0; v < variants; v++) allMm.set(cellMm, v * cellW * cellH);
+  const normalMap = normalMapFromCanvas(canvas, 0.35, { mm: allMm, mmPerPx: leafLongMm / cellW });
   normalMap.wrapS = normalMap.wrapT = THREE.ClampToEdgeWrapping;
   return {
     map, normalMap, variants,

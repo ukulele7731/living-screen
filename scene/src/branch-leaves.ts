@@ -19,7 +19,7 @@ export function makeBranchLeaves(season: Season, tips: TwigTip[]): BranchLeaves 
   const bl = cfg.branch;
   const shape = LEAF_SHAPES[bl.kind];
   const sp = cfg.species[bl.kind as keyof typeof cfg.species];
-  const atlas = paintLeafAtlas(shape, sp.palettes, 77);
+  const atlas = paintLeafAtlas(shape, sp.palettes, 77, cfg.baseSize * sp.size * 1000);
   const r = rng(bl.seed);
   const perTip = bl.perTip;
   const batch = new LeafBatch(shape, atlas, sp.profile, tips.length * perTip, { size: cfg.baseSize * sp.size, translucency: cfg.translucency, segments: bl.segments });
