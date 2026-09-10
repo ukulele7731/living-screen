@@ -5,5 +5,8 @@ import path from 'node:path';
 export default defineConfig({
   base: './',
   server: { fs: { allow: [path.resolve(__dirname, '..')] }, port: 5173 },
-  build: { target: 'es2022', sourcemap: false }
+  build: {
+    target: 'es2022', sourcemap: false,
+    rolldownOptions: { input: { main: path.resolve(__dirname, 'index.html'), leaf: path.resolve(__dirname, 'leaf.html') } }
+  }
 });

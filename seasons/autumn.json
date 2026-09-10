@@ -52,6 +52,49 @@
     ]
   },
 
+  "leaves": {
+    "comment": "Листья (4.2). baseSize — длинная сторона листа в метрах при size = 1. profile: dome — купол (края вверх), wave/waveN — волна края, boat — лодочка вдоль жилки, tipCurl — загнутый кончик, dryCurl — сила скручивания краёв при сухости 1. palettes — нарисованные «исходные» листья: цвета от черешка (base) через середину (mid) к кончику (tip), кайма (edge), жилки (vein).",
+    "baseSize": 0.24,
+    "translucency": 1.1,
+    "branch": { "kind": "maple", "perTip": 1, "density": 0.55, "segments": 10, "seed": 5 },
+    "species": {
+      "maple":    { "size": 1.4, "profile": { "dome": 0.05, "wave": 0.0,  "waveN": 0, "boat": 0.02, "tipCurl": 0.06, "dryCurl": 0.22 },
+                    "palettes": [
+                      { "base": "#c9a227", "mid": "#e8a530", "tip": "#d8531e", "edge": "#8a3a12", "vein": "#a3661c" },
+                      { "base": "#d9b62a", "mid": "#f0c23a", "tip": "#e9a22c", "edge": "#9a5a18", "vein": "#b48a2a" },
+                      { "base": "#c8531f", "mid": "#d9461c", "tip": "#a92d16", "edge": "#6a1c0c", "vein": "#e0862c" },
+                      { "base": "#a7a22c", "mid": "#d9b12a", "tip": "#e07a22", "edge": "#8c4a14", "vein": "#a0762a" } ] },
+      "oak":      { "size": 1.2, "profile": { "dome": 0.04, "wave": 0.05, "waveN": 4, "boat": 0.0,  "tipCurl": 0.0,  "dryCurl": 0.28 },
+                    "palettes": [
+                      { "base": "#8c6a2a", "mid": "#b07a2c", "tip": "#8f4d1c", "edge": "#5a2e10", "vein": "#c59a4a" },
+                      { "base": "#a88a2e", "mid": "#c9973a", "tip": "#b56a26", "edge": "#6e3a14", "vein": "#d4ad5a" } ] },
+      "birch":    { "size": 0.9, "profile": { "dome": 0.02, "wave": 0.0,  "waveN": 0, "boat": 0.0,  "tipCurl": 0.08, "dryCurl": 0.25 },
+                    "palettes": [
+                      { "base": "#c9b52c", "mid": "#e8cc38", "tip": "#e2b02e", "edge": "#9a6a1c", "vein": "#b8962c" },
+                      { "base": "#b7a72c", "mid": "#d9be34", "tip": "#c98a26", "edge": "#8a5a18", "vein": "#a88a2c" } ] },
+      "aspen":    { "size": 0.8, "profile": { "dome": 0.05, "wave": 0.03, "waveN": 6, "boat": 0.0,  "tipCurl": 0.0,  "dryCurl": 0.25 },
+                    "palettes": [
+                      { "base": "#d9a52c", "mid": "#eab233", "tip": "#e07a24", "edge": "#8a4a16", "vein": "#c48a2c" },
+                      { "base": "#c4462a", "mid": "#d95a2a", "tip": "#e09a2e", "edge": "#7a2a12", "vein": "#e2a84a" } ] },
+      "linden":   { "size": 1.0, "profile": { "dome": 0.06, "wave": 0.0,  "waveN": 0, "boat": 0.0,  "tipCurl": 0.05, "dryCurl": 0.25 },
+                    "palettes": [
+                      { "base": "#c9b22e", "mid": "#e6c93a", "tip": "#dcb332", "edge": "#9a6e1e", "vein": "#b0982e" },
+                      { "base": "#a9a32e", "mid": "#d1b934", "tip": "#e0a12c", "edge": "#8a5e1a", "vein": "#a8902e" } ] },
+      "chestnut": { "size": 1.6, "profile": { "dome": -0.02, "wave": 0.03, "waveN": 5, "boat": 0.05, "tipCurl": 0.04, "dryCurl": 0.3 },
+                    "palettes": [
+                      { "base": "#a87a2a", "mid": "#c98a2e", "tip": "#9a5a1e", "edge": "#5e3210", "vein": "#d4a45a" },
+                      { "base": "#b8902e", "mid": "#d9a334", "tip": "#b06a24", "edge": "#6a3a12", "vein": "#dcb46a" } ] },
+      "rowan":    { "size": 1.1, "profile": { "dome": 0.03, "wave": 0.0,  "waveN": 0, "boat": 0.06, "tipCurl": 0.05, "dryCurl": 0.25 },
+                    "palettes": [
+                      { "base": "#c98a2c", "mid": "#e0742a", "tip": "#c8401e", "edge": "#7a2810", "vein": "#e8a44a" },
+                      { "base": "#d9a72e", "mid": "#e9b634", "tip": "#d9702a", "edge": "#8a4014", "vein": "#e6c060" } ] },
+      "willow":   { "size": 1.5, "profile": { "dome": 0.0,  "wave": 0.0,  "waveN": 0, "boat": 0.12, "tipCurl": 0.06, "dryCurl": 0.2 },
+                    "palettes": [
+                      { "base": "#a9b23a", "mid": "#c9c23a", "tip": "#d8b232", "edge": "#7a6a1e", "vein": "#c6b85a" },
+                      { "base": "#b9b03a", "mid": "#d9c23a", "tip": "#e0a92c", "edge": "#8a6a1c", "vein": "#d2c060" } ] }
+    }
+  },
+
   "ground": {
     "comment": "Земля невидима — картина уже нарисована. Плоскость только ловит тени листьев и ветки (ShadowMaterial) и служит опорой для ковра.",
     "shadowOpacity": 0.32

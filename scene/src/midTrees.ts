@@ -9,6 +9,9 @@ import { rng, makeCanvas, canvasTexture, makeNoise2D, hexToRgb, mixRgb, lerp } f
 
 interface Seg { a: THREE.Vector3; b: THREE.Vector3; ra: number; rb: number }
 
+/** Конец тонкой веточки — точка, куда вешается лист. */
+export interface TwigTip { pos: THREE.Vector3; dir: THREE.Vector3 }
+
 type TreeCfg = Season['midTrees']['trees'][number];
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -57,7 +60,7 @@ function grow(segs: Seg[], pos: THREE.Vector3, dir: THREE.Vector3, len: number, 
   }
 }
 
-function buildTree(cfg: TreeCfg): THREE.BufferGeometry {
+function buildTree(cfg: TreeCfg, tips: TwigTip[]): THREE.BufferGeometry {
   const r = rng(cfg.seed);
   const segs: Seg[] = [];
   const base = new THREE.Vector3(...(cfg.base as [number, number, number]));
@@ -76,6 +79,9 @@ function buildTree(cfg: TreeCfg): THREE.BufferGeometry {
     grow(segs, start, dir, limb.length, limb.radius, 0, 6, r);
   }
 
+  for (const s of segs) {
+    if (s.rb <= 0.005) tips.push({ pos: s.b.clone(), dir: s.b.clone().sub(s.a).normalize() });
+  }
   const geos: THREE.BufferGeometry[] = [];
   const dir = new THREE.Vector3(), mid = new THREE.Vector3(), quat = new THREE.Quaternion();
   for (const s of segs) {
@@ -126,20 +132,21 @@ function makeBarkTexture(dark: string, light: string): { map: THREE.CanvasTextur
   return { map, bump };
 }
 
-export function makeMidTrees(season: Season): THREE.Group {
+export function makeMidTrees(season: Season): { group: THREE.Group; tips: TwigTip[] } {
   const group = new THREE.Group();
   group.name = 'midTrees';
+  const tips: TwigTip[] = [];
   const { map, bump } = makeBarkTexture(season.midTrees.bark, season.midTrees.barkLight);
   const material = new THREE.MeshStandardMaterial({
     map, bumpMap: bump, bumpScale: 0.6, roughness: 0.92, metalness: 0
   });
   for (const cfg of season.midTrees.trees) {
-    const mesh = new THREE.Mesh(buildTree(cfg), material);
+    const mesh = new THREE.Mesh(buildTree(cfg, tips), material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.matrixAutoUpdate = false;
     mesh.updateMatrix();
     group.add(mesh);
   }
-  return group;
+  return { group, tips };
 }

@@ -7,6 +7,7 @@ import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { season } from './config';
 import { makeLighting } from './lighting';
 import { makeMidTrees } from './midTrees';
+import { makeBranchLeaves } from './branch-leaves';
 import { makeGround } from './ground';
 import { loadBackdrop } from './backdrop';
 import { makeComposite } from './composite';
@@ -51,7 +52,10 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
 
   const lighting = makeLighting(season);
   scene.add(lighting.group);
-  scene.add(makeMidTrees(season));
+  const trees = makeMidTrees(season);
+  scene.add(trees.group);
+  const branchLeaves = makeBranchLeaves(season, trees.tips);
+  for (const b of branchLeaves.batches) scene.add(b.mesh);
   scene.add(makeGround(season));
 
   // ── постобработка: 3D-слой → тонмаппинг и sRGB → композит с задником ──
@@ -84,6 +88,7 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
   const renderFrame = (dt: number) => {
     time += dt;
     composite.update(time);
+    branchLeaves.update(time);
     renderer.info.reset();
     composer.render();
   };
