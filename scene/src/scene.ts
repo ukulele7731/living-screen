@@ -1,81 +1,70 @@
-// Сборка сцены: рендерер, камера, свет, небо, облака, дальний план, туман,
-// средние деревья, земля, глубина резкости, resize и цикл кадров.
+// Сборка сцены: задник-картина, поверх — 3D-слой (свет, ветка среднего плана,
+// невидимая земля для теней), композит с живыми облаками, resize, цикл кадров.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { season } from './config';
 import { makeLighting } from './lighting';
-import { makeSky } from './sky';
-import { makeClouds } from './clouds';
-import { makeFarTrees } from './farTrees';
-import { makeMist } from './mist';
 import { makeMidTrees } from './midTrees';
 import { makeGround } from './ground';
+import { loadBackdrop } from './backdrop';
+import { makeComposite } from './composite';
 import { makeDevOverlay } from './dev';
 
 export interface LivingScene {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
+  /** Юниформы финального композита — для отладки из консоли. */
+  composite: Record<string, THREE.IUniform>;
   /** Отрисовать один кадр вручную (для скриншотов и тестов). */
   renderOnce(): void;
   start(): void;
 }
 
-export function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement): LivingScene {
+export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement): Promise<LivingScene> {
+  const flags = new URLSearchParams(location.search);   // отладка: ?shadow=0&clouds=0
+
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = season.exposure;
-  const flags = new URLSearchParams(location.search);   // отладка: ?dof=0&shadow=0&pitch=-30
   renderer.shadowMap.enabled = flags.get('shadow') !== '0';
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.setClearColor(0x000000, 0);                   // 3D-слой рендерится на прозрачном
   renderer.info.autoReset = false;
 
-  const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(new THREE.Color(season.fog.color), season.fog.density);
+  const backdrop = await loadBackdrop(season, import.meta.env.BASE_URL);
 
+  const scene = new THREE.Scene();
+
+  // Камера: горизонтально на уровне глаз, с наклоном вниз, чтобы её горизонт
+  // совпал с горизонтом картины (доля высоты кадра `backdrop.horizon`).
   const cam = season.camera;
   const camera = new THREE.PerspectiveCamera(cam.fov, 1, cam.near, cam.far);
   camera.position.set(0, cam.height, 0);
-  camera.lookAt(0, cam.height, -10);        // горизонтально, на уровне глаз
-  if (flags.get('pitch')) camera.rotation.x = Number(flags.get('pitch')) * Math.PI / 180;
+  // горизонт ниже центра кадра → камера смотрит чуть вверх (pitch > 0)
+  const pitch = Math.atan((season.backdrop.horizon - 0.5) * 2 * Math.tan(cam.fov / 2 * Math.PI / 180));
+  camera.rotation.set(pitch, 0, 0);
 
-  const t0 = performance.now();
-  const stage = (name: string, fn: () => void) => {
-    const t = performance.now();
-    fn();
-    console.log(`[scene] ${name}: ${(performance.now() - t).toFixed(0)} мс`);
-  };
   const lighting = makeLighting(season);
   scene.add(lighting.group);
-  stage('небо', () => scene.add(makeSky(season, lighting.sunDir)));
-  const clouds = makeClouds(season, lighting.sunDir);
-  scene.add(clouds.group);
-  stage('дальние деревья', () => scene.add(makeFarTrees(season)));
-  const mist = makeMist(season);
-  scene.add(mist.group);
-  stage('деревья среднего плана', () => scene.add(makeMidTrees(season)));
-  let maxAniso = 1;
-  stage('анизотропия', () => { maxAniso = renderer.capabilities.getMaxAnisotropy(); });
-  stage('земля', () => scene.add(makeGround(season, maxAniso)));
-  console.log(`[scene] сборка: ${(performance.now() - t0).toFixed(0)} мс`);
+  scene.add(makeMidTrees(season));
+  scene.add(makeGround(season));
 
-  // ── постобработка: рендер → лёгкое боке → тонмаппинг и sRGB ──
-  // render target с MSAA: иначе антиалиасинг рендерера в композере не работает
+  // ── постобработка: 3D-слой → тонмаппинг и sRGB → композит с задником ──
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
   const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: 4 });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
-  const bokeh = new BokehPass(scene, camera, {
-    focus: season.dof.focus, aperture: season.dof.aperture, maxblur: season.dof.maxBlur
-  });
-  bokeh.enabled = flags.get('dof') !== '0';
-  composer.addPass(bokeh);
   composer.addPass(new OutputPass());
+  const composite = makeComposite(season, backdrop);
+  const cu = composite.pass.uniforms as Record<string, THREE.IUniform>;
+  if (flags.get('clouds') === '0') cu.cloudOpacity.value = 0;
+  if (flags.get('mask') === '1') cu.debugMask.value = 1;
+  composer.addPass(composite.pass);
 
   const resize = () => {
     const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
@@ -83,6 +72,7 @@ export function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement): Livi
     composer.setSize(w * renderer.getPixelRatio(), h * renderer.getPixelRatio());
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
+    composite.resize(w, h);
   };
   window.addEventListener('resize', resize);
   resize();
@@ -93,14 +83,13 @@ export function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement): Livi
 
   const renderFrame = (dt: number) => {
     time += dt;
-    clouds.update(time);
-    mist.update(time);
+    composite.update(time);
     renderer.info.reset();
     composer.render();
   };
 
   return {
-    renderer, scene, camera,
+    renderer, scene, camera, composite: cu,
     renderOnce() { renderFrame(0); },
     start() {
       renderer.setAnimationLoop(() => {

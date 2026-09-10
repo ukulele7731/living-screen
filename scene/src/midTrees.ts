@@ -31,7 +31,7 @@ function grow(segs: Seg[], pos: THREE.Vector3, dir: THREE.Vector3, len: number, 
   // ветка гнётся дугой в одну сторону, а не дрожит случайно
   const bendAxis = perp(d, r);
   const bend = (0.08 + r() * 0.14) * (r() < 0.5 ? 1 : -1);
-  const droop = radius < 0.02 ? 0.35 : radius < 0.06 ? 0.12 : radius < 0.12 ? 0.0 : -0.06;
+  const droop = radius < 0.02 ? 0.22 : radius < 0.06 ? 0.1 : radius < 0.12 ? 0.02 : -0.05;
   const sideAt = Math.floor(r() * (parts - 1));
   for (let i = 0; i < parts; i++) {
     d.applyAxisAngle(bendAxis, bend).addScaledVector(UP, -droop / parts).normalize();
