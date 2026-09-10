@@ -27,7 +27,7 @@ export class LeafBatch {
   private bends: THREE.InstancedBufferAttribute;
   private rects: THREE.InstancedBufferAttribute;
 
-  constructor(readonly shape: LeafShape, readonly atlas: LeafAtlas, profile: LeafProfile, capacity: number, opts: { size: number; translucency?: number; segments?: number }) {
+  constructor(readonly shape: LeafShape, readonly atlas: LeafAtlas, profile: LeafProfile, capacity: number, opts: { size: number; translucency?: number; segments?: number; paperWarm?: number; rim?: number }) {
     this.capacity = capacity;
     const geo = buildLeafGeometry(shape, { segments: opts.segments ?? 24 });
     geo.scale(opts.size, opts.size, opts.size);
@@ -39,7 +39,7 @@ export class LeafBatch {
     geo.setAttribute('iParams', this.params);
     geo.setAttribute('iBend', this.bends);
     geo.setAttribute('iUvRect', this.rects);
-    this.material = makeLeafMaterial({ map: atlas.map, normalMap: atlas.normalMap, profile, translucency: opts.translucency, size: opts.size });
+    this.material = makeLeafMaterial({ map: atlas.map, normalMap: atlas.normalMap, profile, shape, size: opts.size, translucency: opts.translucency, paperWarm: opts.paperWarm, rim: opts.rim });
     this.mesh = new THREE.InstancedMesh(geo, this.material, capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.castShadow = true;

@@ -20,7 +20,7 @@ export async function makeTestLeaf(season: Season, camera: THREE.PerspectiveCame
   });
   const size = season.leaves.baseSize * sp.size;
   const atlas = atlasFromImage(img, shape, size * 1000);
-  const batch = new LeafBatch(shape, atlas, sp.profile, 1, { size, translucency: season.leaves.translucency });
+  const batch = new LeafBatch(shape, atlas, sp.profile, 1, { size, translucency: season.leaves.translucency, paperWarm: season.leaves.paperWarm, rim: season.leaves.rim });
   const pos = groundPoint(camera, t.screen[0], t.screen[1], new THREE.Vector3());
   pos.y += t.lift;
   const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2 + t.tilt, t.yaw, 0, 'YXZ'));

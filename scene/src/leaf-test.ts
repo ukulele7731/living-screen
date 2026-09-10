@@ -98,7 +98,7 @@ async function rebuild() {
     atlas = paintLeafAtlas(shape, sp.palettes, 77, sizeMm);
   }
   if (batch) { scene.remove(batch.mesh); batch.mesh.geometry.dispose(); batch.material.dispose(); }
-  batch = new LeafBatch(shape, atlas, sp.profile, 1, { size: 0.6, translucency: Number($('trans').value) });
+  batch = new LeafBatch(shape, atlas, sp.profile, 1, { size: 0.6, translucency: Number($('trans').value), paperWarm: texSel.value === 'test' ? season.leaves.paperWarm : 0, rim: season.leaves.rim });
   ($('variant')).max = String(atlas.variants - 1);
   if (Number($('variant').value) >= atlas.variants) $('variant').value = '0';
   scene.add(batch.mesh);
