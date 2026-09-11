@@ -1,7 +1,9 @@
 // Менеджер листьев: пакеты по видам и уровням детализации, спавн, физика с
 // подшагами, ковёр (лежащие листья, лимит и вытеснение старых), повторный
 // взлёт порывом. Уровень детализации — по расстоянию до камеры: близкие
-// листья 24 сегмента с торцом, средние 12, дальние 6 без торца.
+// листья — сетка 24 сегмента с торцом (гнутся), дальние — грубый многоугольник
+// ~24 треугольника на грань. Лежащие переезжают в отдельный пакет-ковёр на вид:
+// одна грань ~24 треугольника, лицом или изнанкой вверх, с контактной тенью.
 import * as THREE from 'three';
 import type { Season } from './config';
 import { rng } from './util';
@@ -23,11 +25,12 @@ export interface SpawnOptions {
   scale?: number;
 }
 
-const LODS = [
-  { segments: 24, noRim: false },
-  { segments: 12, noRim: false },
-  { segments: 6, noRim: true }
+const LODS: { segments?: number; polygon?: 'both'; castShadow: boolean }[] = [
+  { segments: 24, castShadow: true },      // ближе field.lodDistance[0]: гнётся, торец, тень
+  { polygon: 'both', castShadow: false }   // дальше: многоугольник, без тени
 ];
+/** индекс пакета-ковра в batches/free (после уровней детализации) */
+const CARPET = LODS.length;
 
 interface KindSet { atlas: LeafAtlas; batches: LeafBatch[]; free: number[][] }
 
@@ -39,6 +42,7 @@ export class LeafField {
   private aero: AeroCfg;
   private m = new THREE.Matrix4();
   private tmp = new THREE.Vector3();
+  private tilt = new THREE.Vector3();
   private spawnAcc = 0;
   /** статистика для dev-панели */
   stats = { flying: 0, ground: 0, spawned: 0, triangles: 0 };
@@ -55,12 +59,19 @@ export class LeafField {
       const atlas = paintLeafAtlas(shape, sp.palettes, 90 + kind.length, size * 1000);
       const batches = LODS.map((lod) => {
         const b = new LeafBatch(shape, atlas, sp.profile, cap, {
-          size, translucency: cfg.translucency, segments: lod.segments, noRim: lod.noRim, rim: cfg.rim
+          size, translucency: cfg.translucency, segments: lod.segments, polygon: lod.polygon, castShadow: lod.castShadow, rim: cfg.rim
         });
         this.group.add(b.mesh);
         return b;
       });
-      const free = LODS.map(() => Array.from({ length: cap }, (_, i) => cap - 1 - i));
+      const carpetCap = season.field.maxGround + 20;
+      const carpet = new LeafBatch(shape, atlas, sp.profile, carpetCap, {
+        size, translucency: cfg.translucency, polygon: 'front', castShadow: true, rim: cfg.rim   // контактная тень: ~20 треугольников на лист
+      });
+      carpet.mesh.name = 'carpet:' + kind;
+      this.group.add(carpet.mesh);
+      batches.push(carpet);
+      const free = batches.map((b) => Array.from({ length: b.capacity }, (_, i) => b.capacity - 1 - i));
       this.kinds.set(kind, { atlas, batches, free });
     }
     this.group.name = 'leafField';
@@ -89,21 +100,40 @@ export class LeafField {
     return out;
   }
 
+  /** Уровень детализации по дальности; для летящего с гистерезисом, чтобы не мигал на границе. */
   private lodFor(body: LeafBody): number {
+    if (body.state === 'ground' || (body.state === 'fading' && body.lod === CARPET)) return CARPET;
     const d = body.pos.distanceTo(this.camera.position);
     const t = this.season.field.lodDistance;
-    // гистерезис: уровень меняется только при заметном пересечении порога
-    if (body.lod === 0) return d > t[0] * 1.15 ? (d > t[1] * 1.15 ? 2 : 1) : 0;
-    if (body.lod === 1) return d < t[0] * 0.85 ? 0 : d > t[1] * 1.15 ? 2 : 1;
-    return d < t[1] * 0.85 ? (d < t[0] * 0.85 ? 0 : 1) : 2;
+    let lod = 0;
+    for (let i = 0; i < t.length && i < LODS.length - 1; i++) {
+      const th = body.lod === CARPET ? t[i] : body.lod <= i ? t[i] * 1.15 : t[i] * 0.85;
+      if (d > th) lod = i + 1;
+    }
+    return lod;
   }
 
   private takeSlot(kind: string, lod: number): number {
     const set = this.kinds.get(kind)!;
+    if (lod === CARPET) {
+      const free = set.free[CARPET];
+      return free.length ? CARPET * 100000 + free.pop()! : -1;
+    }
     for (let l = lod; l < LODS.length; l++) {              // нет места — берём уровень грубее
       const free = set.free[l];
       if (free.length) { return l * 100000 + free.pop()!; }
     }
+    return -1;
+  }
+
+  /** Матрица экземпляра с учётом ковра: лежащий изнанкой вверх переворачивается вокруг жилки. */
+  private writeBodyMatrix(body: LeafBody, out: THREE.Matrix4): number {
+    body.writeMatrix(out);
+    if (body.lod !== CARPET) return 0;
+    const q = body.quat;
+    const ny = 2 * (q.y * q.z + q.w * q.x);                // y-компонента нормали листа (локальная +z)
+    if (ny >= 0) return 1;
+    out.multiply(this.kinds.get(body.kind)!.batches[CARPET].flip);
     return -1;
   }
 
@@ -143,11 +173,12 @@ export class LeafField {
 
   private writeFull(body: LeafBody) {
     const batch = this.kinds.get(body.kind)!.batches[body.lod];
-    body.writeMatrix(this.m);
+    const side = this.writeBodyMatrix(body, this.m);
     batch.set(body.slot, {
       matrix: this.m, dry: body.dry, twist: body.twist, flutter: body.flutter, phase: body.phase,
       variant: body.variant, bend: body.bend, color: body.tint
     });
+    if (side) batch.setMotion(body.slot, this.m, body.bend, body.flutter, side);
   }
 
   private release(body: LeafBody) {
@@ -167,7 +198,11 @@ export class LeafField {
     const want = this.lodFor(body);
     if (want === body.lod) return;
     const packed = this.takeSlot(body.kind, want);
-    if (packed < 0) return;
+    if (packed < 0) {
+      // ковёр переполнен — лист исчезает (лимит лежащих всё равно рядом)
+      if (want === CARPET) { body.state = 'fading'; }
+      return;
+    }
     this.release(body);
     body.lod = Math.floor(packed / 100000);
     body.slot = packed % 100000;
@@ -212,13 +247,15 @@ export class LeafField {
           const slow = b.vel.lengthSq() < 0.04 && b.angVel.lengthSq() < 0.3;
           if (lowest < gy + 0.03 && slow) b.restTimer += h; else b.restTimer = 0;
         }
-        if (b.restTimer > cfg.restTime) { b.state = 'ground'; b.restTimer = 0; }
+        if (b.restTimer > cfg.restTime) { b.state = 'ground'; b.restTimer = 0; b.bend.z = 0; b.flutter = 0; }
         // улетел далеко — убираем (главные держатся у камеры, их предел шире)
         const zLim = b.role === 'hero' ? 12 : 4;
         if (b.pos.y < -2 || Math.abs(b.pos.x) > 60 || b.pos.z > zLim || b.pos.z < -80) { this.remove(b); continue; }
         flying++;
       } else if (b.state === 'ground') {
-        b.settle(dt);
+        // лежащий лист приподнят к зрителю, как листья на картине
+        const tilt = this.tilt.set(this.camera.position.x - b.pos.x, 0, this.camera.position.z - b.pos.z).normalize().multiplyScalar(cfg.groundTilt);
+        b.settle(dt, tilt);
         ground++;
         // порыв поднимает лежащие: сначала край, потом весь лист
         this.wind.sample(windAt.copy(b.pos).setY(b.pos.y + 1.0), windAt);   // ветер над листом, не в пограничном слое
@@ -247,9 +284,9 @@ export class LeafField {
     // матрицы в пакеты
     let tris = 0;
     for (const b of this.bodies) {
-      b.writeMatrix(this.m);
+      const side = this.writeBodyMatrix(b, this.m);
       const batch = this.kinds.get(b.kind)!.batches[b.lod];
-      batch.setMotion(b.slot, this.m, b.bend, b.flutter);
+      batch.setMotion(b.slot, this.m, b.bend, b.flutter, side);
       tris += batch.triangles;
     }
     this.stats.triangles = tris;

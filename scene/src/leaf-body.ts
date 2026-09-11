@@ -21,6 +21,7 @@ export interface AeroCfg {
   groundSpring: number;
   groundDamp: number;
   groundFriction: number;
+  groundTilt: number;    // наклон лежащего листа к зрителю (0 — плашмя, 0.6 — ~30°)
   restTime: number;      // сколько секунд покоя до «лежит»
   liftSpeed: number;     // ветер, при котором лежащий лист может взлететь
 }
@@ -204,10 +205,14 @@ export class LeafBody {
     return lowest;
   }
 
-  /** Лежит: медленно доворачиваем к плоскому положению на земле, ветер может поднять. */
-  settle(dt: number) {
+  /** Лежит: медленно доворачиваем к положению на земле, ветер может поднять.
+   *  tilt — наклон нормали к зрителю (лист лежит не плашмя, а на других листьях, как на картине:
+   *  с высоты глаз плоский лист в 5 м виден под 13° — тонкой полоской). */
+  settle(dt: number, tilt?: THREE.Vector3) {
     const n = TMP.n.set(0, 0, 1).applyQuaternion(this.quat);
-    const target = n.y >= 0 ? UP : TMP.v.set(0, -1, 0);
+    const target = TMP.v.copy(UP);
+    if (tilt) target.add(tilt).normalize();
+    if (n.y < 0) target.negate();
     TMP.dq.setFromUnitVectors(n, target);
     TMP.q.identity().slerp(TMP.dq, Math.min(1, dt * 2.5));
     this.quat.premultiply(TMP.q).normalize();

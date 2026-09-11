@@ -37,7 +37,7 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
   const flags = new URLSearchParams(location.search);   // отладка: ?shadow=0&clouds=0
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setPixelRatio(1);                       // не рисуем крупнее экрана: DPR > 1 на ТВ и ноутбуке — лишние пиксели
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = season.exposure;

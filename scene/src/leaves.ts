@@ -3,7 +3,7 @@
 // Один draw call на вид (раздел 4.6).
 import * as THREE from 'three';
 import type { LeafShape } from './leaf-shapes';
-import { buildLeafGeometry } from './leaf-geometry';
+import { buildLeafGeometry, buildLeafPolygonGeometry, veinFrame } from './leaf-geometry';
 import { makeLeafMaterial, type LeafMaterial, type LeafProfile } from './leaf-material';
 import type { LeafAtlas } from './leaf-textures';
 
@@ -28,10 +28,24 @@ export class LeafBatch {
   private bends: THREE.InstancedBufferAttribute;
   private rects: THREE.InstancedBufferAttribute;
 
-  constructor(readonly shape: LeafShape, readonly atlas: LeafAtlas, profile: LeafProfile, capacity: number, opts: { size: number; translucency?: number; segments?: number; noRim?: boolean; paperWarm?: number; rim?: number }) {
+  /** матрица переворота листа на изнанку: поворот на 180° вокруг жилки через её середину (в метрах) */
+  readonly flip = new THREE.Matrix4();
+
+  constructor(readonly shape: LeafShape, readonly atlas: LeafAtlas, profile: LeafProfile, capacity: number,
+              opts: { size: number; translucency?: number; segments?: number; noRim?: boolean; paperWarm?: number; rim?: number;
+                      /** грубый многоугольник вместо сетки: 'both' — две грани (дальние), 'front' — одна (ковёр) */
+                      polygon?: 'both' | 'front'; castShadow?: boolean }) {
     this.capacity = capacity;
-    const geo = buildLeafGeometry(shape, { segments: opts.segments ?? 24, noRim: opts.noRim });
+    const geo = opts.polygon
+      ? buildLeafPolygonGeometry(shape, { bothSides: opts.polygon === 'both' })
+      : buildLeafGeometry(shape, { segments: opts.segments ?? 24, noRim: opts.noRim });
     geo.scale(opts.size, opts.size, opts.size);
+    {
+      const f = veinFrame(shape), sz = opts.size;
+      const mid = new THREE.Vector3((f.base[0] + f.dir[0] * f.len / 2) * sz, (f.base[1] + f.dir[1] * f.len / 2) * sz, 0);
+      const axis = new THREE.Vector3(f.dir[0], f.dir[1], 0).normalize();
+      this.flip.makeTranslation(mid.x, mid.y, 0).multiply(new THREE.Matrix4().makeRotationAxis(axis, Math.PI)).multiply(new THREE.Matrix4().makeTranslation(-mid.x, -mid.y, 0));
+    }
     this.triangles = geo.index ? geo.index.count / 3 : 0;
     this.params = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
     this.bends = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
@@ -44,7 +58,7 @@ export class LeafBatch {
     this.material = makeLeafMaterial({ map: atlas.map, normalMap: atlas.normalMap, profile, shape, size: opts.size, translucency: opts.translucency, paperWarm: opts.paperWarm, rim: opts.rim });
     this.mesh = new THREE.InstancedMesh(geo, this.material, capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.mesh.castShadow = true;
+    this.mesh.castShadow = opts.castShadow ?? true;
     this.mesh.receiveShadow = true;
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
@@ -64,10 +78,10 @@ export class LeafBatch {
     this.mesh.count = this.count;
   }
 
-  /** Только матрица и изгиб — для физики каждый кадр. */
-  setMotion(i: number, matrix: THREE.Matrix4, bend: THREE.Vector3, flutter: number) {
+  /** Только матрица и изгиб — для физики каждый кадр. side ≠ 0 — ковёр: одна грань, лицо (+1) или изнанка (−1). */
+  setMotion(i: number, matrix: THREE.Matrix4, bend: THREE.Vector3, flutter: number, side = 0) {
     this.mesh.setMatrixAt(i, matrix);
-    this.bends.setXYZW(i, bend.x, bend.y, bend.z, 0);
+    this.bends.setXYZW(i, bend.x, bend.y, bend.z, side);
     this.params.setZ(i, flutter);
   }
 

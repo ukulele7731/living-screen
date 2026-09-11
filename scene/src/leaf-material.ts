@@ -8,7 +8,7 @@
 //             контровой блик по краю от солнца
 // Атрибуты экземпляра (InstancedBufferAttribute):
 //   iParams: dry, twist, flutter, phase
-//   iBend:   направление потока в плоскости листа (x, y), знак/величина изгиба (z), запас (w)
+//   iBend:   направление потока в плоскости листа (x, y), знак/величина изгиба (z); w ≠ 0 — ковёр: сторона грани (±1)
 //   iUvRect: смещение (x, y) и масштаб (z, w) в атласе текстур
 import * as THREE from 'three';
 import type { LeafShape } from './leaf-shapes';
@@ -65,7 +65,7 @@ export function makeLeafMaterial(opts: LeafMaterialOptions): LeafMaterial {
     time: { value: 0 },
     profile: { value: new THREE.Vector4(p.dome, p.tipLift, p.dryCurl, p.bend) },
     translucency: { value: opts.translucency ?? 1.1 },
-    backTint: { value: new THREE.Color(opts.backTint ?? '#d9cf9c') },
+    backTint: { value: new THREE.Color(opts.backTint ?? '#e9dcb2') },
     leafSize: { value: size },
     veinBase: { value: new THREE.Vector2(f.base[0] * size, f.base[1] * size) },
     veinDir: { value: new THREE.Vector2(f.dir[0], f.dir[1]) },
@@ -120,7 +120,8 @@ export function makeLeafMaterial(opts: LeafMaterialOptions): LeafMaterial {
         float zx = leafZ(position.xy + vec2(eps, 0.0), iParams, iBend);
         float zy = leafZ(position.xy + vec2(0.0, eps), iParams, iBend);
         vec3 bentN = normalize(vec3(-(zx - z0) / eps, -(zy - z0) / eps, 1.0));
-        vec3 objectNormal = aux.w > 0.5 ? bentN : (aux.w < -0.5 ? -bentN : vec3(normal));
+        // iBend.w ≠ 0 — ковёр: одна грань, всегда смотрит вверх, а знак говорит, лицо это или изнанка
+        vec3 objectNormal = (iBend.w != 0.0 || aux.w > 0.5) ? bentN : (aux.w < -0.5 ? -bentN : vec3(normal));
         #ifdef USE_TANGENT
           vec3 objectTangent = vec3( tangent.xyz );
         #endif
@@ -129,6 +130,7 @@ export function makeLeafMaterial(opts: LeafMaterialOptions): LeafMaterial {
         vec3 transformed = vec3(position);
         transformed.z = leafZ(position.xy, iParams, iBend) + position.z;
         vAux = aux;
+        if (iBend.w != 0.0) vAux.w = iBend.w;
       `)
       .replace('#include <uv_vertex>', /* glsl */`
         #include <uv_vertex>
@@ -152,7 +154,7 @@ export function makeLeafMaterial(opts: LeafMaterialOptions): LeafMaterial {
         // белая бумага детского рисунка — чуть теплее, под золотистый свет картины; цвета рисунка не трогаем
         float paper = smoothstep(0.45, 0.9, min(diffuseColor.r, min(diffuseColor.g, diffuseColor.b)));
         diffuseColor.rgb *= mix(vec3(1.0), vec3(1.0, 0.90, 0.74), paper * paperWarm);
-        if (vAux.w < -0.5) diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * backTint * 1.4, 0.55);
+        if (vAux.w < -0.5) diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * backTint * 1.3, 0.35);   // изнанка чуть бледнее, но того же цвета
       `)
       .replace('#include <roughnessmap_fragment>', /* glsl */`
         #include <roughnessmap_fragment>

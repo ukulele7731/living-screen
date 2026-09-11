@@ -191,3 +191,113 @@ export function buildLeafGeometry(shape: LeafShape, opts: LeafGeometryOptions = 
   geo.computeBoundingSphere();
   return geo;
 }
+
+// ── Грубый лист: упрощённый контур (Дуглас–Пекер до maxPoints вершин), триангуляция
+// «отрезанием ушей». ~24 треугольника на сторону. Для дальних листьев и для ковра:
+// лежащему листу и листу в 30 px плотная сетка не нужна, форма покоя и сухость
+// считаются тем же шейдером по вершинам контура и центру.
+
+function simplify(poly: P[], maxPoints: number): P[] {
+  const keep = new Array(poly.length).fill(false);
+  const dist = (p: P, a: P, b: P) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1e-12;
+    const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
+    return Math.hypot(p[0] - a[0] - dx * t, p[1] - a[1] - dy * t);
+  };
+  const run = (tol: number) => {
+    keep.fill(false);
+    // стартуем с двух самых удалённых точек, чтобы замкнутый контур стал двумя ломаными
+    let i0 = 0, i1 = 0, best = -1;
+    for (let i = 0; i < poly.length; i += 4) for (let j = i + 1; j < poly.length; j += 4) {
+      const d = Math.hypot(poly[i][0] - poly[j][0], poly[i][1] - poly[j][1]);
+      if (d > best) { best = d; i0 = i; i1 = j; }
+    }
+    keep[i0] = keep[i1] = true;
+    const dp = (a: number, b: number) => {          // индексы по кольцу от a до b
+      const n = poly.length;
+      let far = -1, fd = 0;
+      for (let k = (a + 1) % n; k !== b; k = (k + 1) % n) {
+        const d = dist(poly[k], poly[a], poly[b]);
+        if (d > fd) { fd = d; far = k; }
+      }
+      if (far >= 0 && fd > tol) { keep[far] = true; dp(a, far); dp(far, b); }
+    };
+    dp(i0, i1); dp(i1, i0);
+    return keep.filter(Boolean).length;
+  };
+  let tol = 0.004;
+  while (run(tol) > maxPoints) tol *= 1.3;
+  return poly.filter((_, i) => keep[i]);
+}
+
+function earClip(poly: P[]): [number, number, number][] {
+  const idx = poly.map((_, i) => i);
+  // делаем обход против часовой
+  let area = 0;
+  for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; area += a[0] * b[1] - b[0] * a[1]; }
+  if (area < 0) idx.reverse();
+  const cross = (a: P, b: P, c: P) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+  const inTri = (p: P, a: P, b: P, c: P) => cross(a, b, p) >= 0 && cross(b, c, p) >= 0 && cross(c, a, p) >= 0;
+  const out: [number, number, number][] = [];
+  let guard = 0;
+  while (idx.length > 3 && guard++ < 10000) {
+    let cut = false;
+    for (let i = 0; i < idx.length; i++) {
+      const ia = idx[(i + idx.length - 1) % idx.length], ib = idx[i], ic = idx[(i + 1) % idx.length];
+      const a = poly[ia], b = poly[ib], c = poly[ic];
+      if (cross(a, b, c) <= 1e-12) continue;                    // вогнутая вершина — не ухо
+      let ok = true;
+      for (const j of idx) { if (j === ia || j === ib || j === ic) continue; if (inTri(poly[j], a, b, c)) { ok = false; break; } }
+      if (!ok) continue;
+      out.push([ia, ib, ic]); idx.splice(i, 1); cut = true; break;
+    }
+    if (!cut) { out.push([idx[0], idx[1], idx[2]]); idx.splice(1, 1); }   // вырожденный случай
+  }
+  if (idx.length === 3) out.push([idx[0], idx[1], idx[2]]);
+  return out;
+}
+
+export interface LeafPolygonOptions {
+  maxPoints?: number;     // вершин контура (по умолчанию 24)
+  bothSides?: boolean;    // лицо и изнанка (летящий далёкий) или только лицо (ковёр)
+  thickness?: number;
+}
+
+export function buildLeafPolygonGeometry(shape: LeafShape, opts: LeafPolygonOptions = {}): THREE.BufferGeometry {
+  const maxPoints = opts.maxPoints ?? 24;
+  const thick = opts.thickness ?? 0.004;
+  const { bbox } = shape;
+  const w = bbox.x1 - bbox.x0, h = bbox.y1 - bbox.y0;
+  const poly = simplify(shape.contour, maxPoints);
+  const tris = earClip(poly);
+  const frame = veinFrame(shape);
+  const [ux, uy] = frame.dir, px = -uy, py = ux;
+  const aux = (p: P, side: number): [number, number, number, number] => {
+    const rx = p[0] - frame.base[0], ry = p[1] - frame.base[1];
+    const t = Math.max(0, Math.min(1, (rx * ux + ry * uy) / frame.len));
+    const s = Math.max(-1, Math.min(1, (rx * px + ry * py) / frame.maxLat));
+    return [0, s, t, side];
+  };
+  const positions: number[] = [], normals: number[] = [], uvs: number[] = [], auxs: number[] = [], indices: number[] = [];
+  const addSide = (z: number, side: number) => {
+    const base = positions.length / 3;
+    for (const p of poly) {
+      positions.push(p[0], p[1], z); normals.push(0, 0, side);
+      uvs.push((p[0] - bbox.x0) / w, (p[1] - bbox.y0) / h); auxs.push(...aux(p, side));
+    }
+    for (const t of tris) {
+      if (side > 0) indices.push(base + t[0], base + t[1], base + t[2]);
+      else indices.push(base + t[0], base + t[2], base + t[1]);
+    }
+  };
+  addSide(thick / 2, 1);
+  if (opts.bothSides) addSide(-thick / 2, -1);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.setAttribute('aux', new THREE.Float32BufferAttribute(auxs, 4));
+  geo.setIndex(indices);
+  geo.computeBoundingSphere();
+  return geo;
+}

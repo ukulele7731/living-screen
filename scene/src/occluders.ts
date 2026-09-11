@@ -4,6 +4,7 @@
 // задаётся в долях экрана (точка касания земли и верх объекта), в метры
 // переводится через камеру: луч через точку экрана пересекается с землёй.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Season } from './config';
 
 /** Точка на земле (y = 0) под пикселем экрана (u, v — доли, v сверху). */
@@ -50,6 +51,9 @@ export function makeOccluders(season: Season, camera: THREE.PerspectiveCamera): 
   const base = new THREE.Vector3();
   const fwd = camera.getWorldDirection(new THREE.Vector3());
   const camDepth = (p: THREE.Vector3) => p.clone().sub(camera.position).dot(fwd);
+  // все заслонки — одна геометрия и один draw call
+  const parts: THREE.BufferGeometry[] = [];
+  const place = (geo: THREE.BufferGeometry, x: number, y: number, z: number) => { geo.translate(x, y, z); parts.push(geo); };
   for (const o of season.occluders.items) {
     if (o.distance) groundPointAtDepth(camera, o.base[0], o.distance, base);
     else groundPoint(camera, o.base[0], o.base[1], base);
@@ -57,25 +61,24 @@ export function makeOccluders(season: Season, camera: THREE.PerspectiveCamera): 
     // ширина в метрах по доле экрана на этой глубине
     const d = camDepth(base);
     const wMeters = (o.width ?? 0) * 2 * d * Math.tan(camera.fov / 2 * Math.PI / 180) * camera.aspect;
-    let mesh: THREE.Mesh;
     if (o.type === 'cylinder') {
       const r = o.radius ?? 0.06;
       // bottom — доля экрана, ниже которой ствол скрыт кустами: там заслонка не нужна
       const y0 = o.bottom ? Math.min(h - 0.2, heightAt(camera, base, o.bottom)) : 0;
-      mesh = new THREE.Mesh(new THREE.CylinderGeometry(r, y0 > 0 ? r : r * 1.2, h - y0, 10), mat);
-      mesh.position.set(base.x, (h + y0) / 2, base.z);
-      if (o.cap) {                                            // фонарь: короб лампы наверху
-        const cap = new THREE.Mesh(new THREE.BoxGeometry(o.cap, o.cap * 1.3, o.cap), mat);
-        cap.position.set(base.x, h - o.cap * 0.65, base.z);
-        group.add(cap);
-      }
+      place(new THREE.CylinderGeometry(r, y0 > 0 ? r : r * 1.2, h - y0, 10), base.x, (h + y0) / 2, base.z);
+      if (o.cap) place(new THREE.BoxGeometry(o.cap, o.cap * 1.3, o.cap), base.x, h - o.cap * 0.65, base.z);   // фонарь: короб лампы
     } else {
       const depth = o.depth ?? 0.6;
-      mesh = new THREE.Mesh(new THREE.BoxGeometry(Math.max(0.3, wMeters), h, depth), mat);
-      mesh.position.set(base.x, h / 2, base.z);
+      place(new THREE.BoxGeometry(Math.max(0.3, wMeters), h, depth), base.x, h / 2, base.z);
     }
+  }
+  if (parts.length) {
+    const merged = mergeGeometries(parts.map((g) => g.toNonIndexed()));
+    for (const g of parts) g.dispose();
+    const mesh = new THREE.Mesh(merged, mat);
     mesh.renderOrder = -2;                                    // раньше листьев: глубина уже записана
-    mesh.name = 'occ:' + o.name;
+    mesh.name = 'occluders';
+    mesh.frustumCulled = false;
     group.add(mesh);
   }
   return group;
