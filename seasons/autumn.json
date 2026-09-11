@@ -6,11 +6,18 @@
     "comment": "Нарисованный задник (scene/public/backdrop.jpg). horizon — доля высоты картинки, где линия горизонта (точка схода аллеи); по ней камера и земля совмещаются с картиной. skyRegion — прямоугольник (доли ширины/высоты), внутри которого ищется небо для маски облаков.",
     "image": "backdrop.jpg",
     "horizon": 0.613,
-    "skyRegion": { "x0": 0.40, "x1": 0.74, "y0": 0.0, "y1": 0.56 }
+    "skyRegion": { "x0": 0.4, "x1": 0.74, "y0": 0, "y1": 0.56 }
   },
 
-  "camera": { "fov": 50, "height": 1.15, "near": 0.3, "far": 400, "comment": "Высота глаз подобрана под перспективу задника (по скамейкам и точке схода), а не по реальному росту." },
-  "exposure": 1.0,
+  "camera": {
+    "fov": 50,
+    "height": 1.15,
+    "near": 0.3,
+    "far": 400,
+    "comment": "Высота глаз подобрана под перспективу задника (по скамейкам и точке схода), а не по реальному росту."
+  },
+
+  "exposure": 1,
 
   "sun": {
     "comment": "Азимут от направления взгляда: 0 — прямо перед камерой, минус — левее, 180 — за спиной. На картине солнце вверху слева впереди: листья между солнцем и камерой будут просвечивать (4.2).",
@@ -45,17 +52,23 @@
     "bark": "#6e5a4a",
     "barkLight": "#a48c70",
     "trees": [
-      { "seed": 11, "base": [-12.6, 0, -13], "trunkHeight": 9.0, "lean": [1.2, 0],
+      {
+        "seed": 11,
+        "base": [-12.6, 0, -13],
+        "trunkHeight": 9,
+        "lean": [1.2, 0],
         "limbs": [
-          { "at": 0.80, "dir": [1, -0.10, 0.03], "length": 4.6, "radius": 0.19 },
-          { "at": 0.94, "dir": [1, 0.14, -0.10], "length": 3.4, "radius": 0.11 }
-        ] }
+          { "at": 0.8, "dir": [1, -0.1, 0.03], "length": 4.6, "radius": 0.19 },
+          { "at": 0.94, "dir": [1, 0.14, -0.1], "length": 3.4, "radius": 0.11 }
+        ]
+      }
     ]
   },
 
   "testLeaf": {
+    "comment2": "Выключен с части 3: листья приходят из поля ветра. Включить для проверки света и тени.",
     "comment": "Один тестовый лист на дорожке: рисунок из галереи теста распознавания. screen — точка на дорожке в долях экрана, lift — подъём над землёй (м), tilt — наклон от плоскости земли (рад), yaw — поворот.",
-    "enabled": true,
+    "enabled": false,
     "kind": "oak",
     "texture": "test-leaves/oak.png",
     "screen": [0.46, 0.92],
@@ -74,56 +87,89 @@
     "rim": 0.35,
     "branch": { "kind": "maple", "perTip": 1, "density": 0.55, "segments": 10, "seed": 5 },
     "species": {
-      "maple":    { "size": 1.4, "profile": { "dome": 0.020, "tipLift": 0.030, "dryCurl": 0.075, "bend": 1 },
-                    "palettes": [
-                      { "base": "#c9a227", "mid": "#e8a530", "tip": "#d8531e", "edge": "#8a3a12", "vein": "#a3661c" },
-                      { "base": "#d9b62a", "mid": "#f0c23a", "tip": "#e9a22c", "edge": "#9a5a18", "vein": "#b48a2a" },
-                      { "base": "#c8531f", "mid": "#d9461c", "tip": "#a92d16", "edge": "#6a1c0c", "vein": "#e0862c" },
-                      { "base": "#a7a22c", "mid": "#d9b12a", "tip": "#e07a22", "edge": "#8c4a14", "vein": "#a0762a" } ] },
-      "oak":      { "size": 1.2, "profile": { "dome": 0.015, "tipLift": 0.025, "dryCurl": 0.085, "bend": 1 },
-                    "palettes": [
-                      { "base": "#8c6a2a", "mid": "#b07a2c", "tip": "#8f4d1c", "edge": "#5a2e10", "vein": "#c59a4a" },
-                      { "base": "#a88a2e", "mid": "#c9973a", "tip": "#b56a26", "edge": "#6e3a14", "vein": "#d4ad5a" } ] },
-      "birch":    { "size": 0.9, "profile": { "dome": 0.012, "tipLift": 0.025, "dryCurl": 0.080, "bend": 1 },
-                    "palettes": [
-                      { "base": "#c9b52c", "mid": "#e8cc38", "tip": "#e2b02e", "edge": "#9a6a1c", "vein": "#b8962c" },
-                      { "base": "#b7a72c", "mid": "#d9be34", "tip": "#c98a26", "edge": "#8a5a18", "vein": "#a88a2c" } ] },
-      "aspen":    { "size": 0.8, "profile": { "dome": 0.015, "tipLift": 0.015, "dryCurl": 0.080, "bend": 1 },
-                    "palettes": [
-                      { "base": "#d9a52c", "mid": "#eab233", "tip": "#e07a24", "edge": "#8a4a16", "vein": "#c48a2c" },
-                      { "base": "#c4462a", "mid": "#d95a2a", "tip": "#e09a2e", "edge": "#7a2a12", "vein": "#e2a84a" } ] },
-      "linden":   { "size": 1.0, "profile": { "dome": 0.018, "tipLift": 0.020, "dryCurl": 0.080, "bend": 1 },
-                    "palettes": [
-                      { "base": "#c9b22e", "mid": "#e6c93a", "tip": "#dcb332", "edge": "#9a6e1e", "vein": "#b0982e" },
-                      { "base": "#a9a32e", "mid": "#d1b934", "tip": "#e0a12c", "edge": "#8a5e1a", "vein": "#a8902e" } ] },
-      "chestnut": { "size": 1.6, "profile": { "dome": 0.010, "tipLift": 0.025, "dryCurl": 0.090, "bend": 1 },
-                    "palettes": [
-                      { "base": "#a87a2a", "mid": "#c98a2e", "tip": "#9a5a1e", "edge": "#5e3210", "vein": "#d4a45a" },
-                      { "base": "#b8902e", "mid": "#d9a334", "tip": "#b06a24", "edge": "#6a3a12", "vein": "#dcb46a" } ] },
-      "rowan":    { "size": 1.1, "profile": { "dome": 0.012, "tipLift": 0.020, "dryCurl": 0.080, "bend": 1 },
-                    "palettes": [
-                      { "base": "#c98a2c", "mid": "#e0742a", "tip": "#c8401e", "edge": "#7a2810", "vein": "#e8a44a" },
-                      { "base": "#d9a72e", "mid": "#e9b634", "tip": "#d9702a", "edge": "#8a4014", "vein": "#e6c060" } ] },
-      "willow":   { "size": 1.5, "profile": { "dome": 0.006, "tipLift": 0.025, "dryCurl": 0.070, "bend": 1 },
-                    "palettes": [
-                      { "base": "#a9b23a", "mid": "#c9c23a", "tip": "#d8b232", "edge": "#7a6a1e", "vein": "#c6b85a" },
-                      { "base": "#b9b03a", "mid": "#d9c23a", "tip": "#e0a92c", "edge": "#8a6a1c", "vein": "#d2c060" } ] }
+      "maple": {
+        "size": 1.4,
+        "profile": { "dome": 0.02, "tipLift": 0.03, "dryCurl": 0.075, "bend": 1 },
+        "palettes": [
+          { "base": "#c9a227", "mid": "#e8a530", "tip": "#d8531e", "edge": "#8a3a12", "vein": "#a3661c" },
+          { "base": "#d9b62a", "mid": "#f0c23a", "tip": "#e9a22c", "edge": "#9a5a18", "vein": "#b48a2a" },
+          { "base": "#c8531f", "mid": "#d9461c", "tip": "#a92d16", "edge": "#6a1c0c", "vein": "#e0862c" },
+          { "base": "#a7a22c", "mid": "#d9b12a", "tip": "#e07a22", "edge": "#8c4a14", "vein": "#a0762a" }
+        ]
+      },
+      "oak": {
+        "size": 1.2,
+        "profile": { "dome": 0.015, "tipLift": 0.025, "dryCurl": 0.085, "bend": 1 },
+        "palettes": [
+          { "base": "#8c6a2a", "mid": "#b07a2c", "tip": "#8f4d1c", "edge": "#5a2e10", "vein": "#c59a4a" },
+          { "base": "#a88a2e", "mid": "#c9973a", "tip": "#b56a26", "edge": "#6e3a14", "vein": "#d4ad5a" }
+        ]
+      },
+      "birch": {
+        "size": 0.9,
+        "profile": { "dome": 0.012, "tipLift": 0.025, "dryCurl": 0.08, "bend": 1 },
+        "palettes": [
+          { "base": "#c9b52c", "mid": "#e8cc38", "tip": "#e2b02e", "edge": "#9a6a1c", "vein": "#b8962c" },
+          { "base": "#b7a72c", "mid": "#d9be34", "tip": "#c98a26", "edge": "#8a5a18", "vein": "#a88a2c" }
+        ]
+      },
+      "aspen": {
+        "size": 0.8,
+        "profile": { "dome": 0.015, "tipLift": 0.015, "dryCurl": 0.08, "bend": 1 },
+        "palettes": [
+          { "base": "#d9a52c", "mid": "#eab233", "tip": "#e07a24", "edge": "#8a4a16", "vein": "#c48a2c" },
+          { "base": "#c4462a", "mid": "#d95a2a", "tip": "#e09a2e", "edge": "#7a2a12", "vein": "#e2a84a" }
+        ]
+      },
+      "linden": {
+        "size": 1,
+        "profile": { "dome": 0.018, "tipLift": 0.02, "dryCurl": 0.08, "bend": 1 },
+        "palettes": [
+          { "base": "#c9b22e", "mid": "#e6c93a", "tip": "#dcb332", "edge": "#9a6e1e", "vein": "#b0982e" },
+          { "base": "#a9a32e", "mid": "#d1b934", "tip": "#e0a12c", "edge": "#8a5e1a", "vein": "#a8902e" }
+        ]
+      },
+      "chestnut": {
+        "size": 1.6,
+        "profile": { "dome": 0.01, "tipLift": 0.025, "dryCurl": 0.09, "bend": 1 },
+        "palettes": [
+          { "base": "#a87a2a", "mid": "#c98a2e", "tip": "#9a5a1e", "edge": "#5e3210", "vein": "#d4a45a" },
+          { "base": "#b8902e", "mid": "#d9a334", "tip": "#b06a24", "edge": "#6a3a12", "vein": "#dcb46a" }
+        ]
+      },
+      "rowan": {
+        "size": 1.1,
+        "profile": { "dome": 0.012, "tipLift": 0.02, "dryCurl": 0.08, "bend": 1 },
+        "palettes": [
+          { "base": "#c98a2c", "mid": "#e0742a", "tip": "#c8401e", "edge": "#7a2810", "vein": "#e8a44a" },
+          { "base": "#d9a72e", "mid": "#e9b634", "tip": "#d9702a", "edge": "#8a4014", "vein": "#e6c060" }
+        ]
+      },
+      "willow": {
+        "size": 1.5,
+        "profile": { "dome": 0.006, "tipLift": 0.025, "dryCurl": 0.07, "bend": 1 },
+        "palettes": [
+          { "base": "#a9b23a", "mid": "#c9c23a", "tip": "#d8b232", "edge": "#7a6a1e", "vein": "#c6b85a" },
+          { "base": "#b9b03a", "mid": "#d9c23a", "tip": "#e0a92c", "edge": "#8a6a1c", "vein": "#d2c060" }
+        ]
+      }
     }
   },
 
   "wind": {
     "comment": "Поле ветра (4.3). Направление в градусах: 0 — слева направо, плюс — к камере. Скорости м/с. Порыв: фронт шириной width м проходит сцену. Вихри дрейфуют с ветром и раз в boostEvery секунд (в среднем) усиливаются на 5 с.",
     "base": { "speed": [0.3, 1.5], "direction": 0, "spread": 20, "period": [20, 40] },
-    "gust": { "speed": [2.0, 4.0], "duration": [2, 4], "interval": [8, 25], "width": 10 },
+    "gust": { "speed": [2, 4], "duration": [2, 4], "interval": [8, 25], "width": 10 },
     "vortices": { "count": 2, "radius": [2.5, 5], "strength": [0.6, 1.8], "boostEvery": 150 },
     "turbulence": { "scale": 0.35, "speed": 0.25, "strength": 0.9 },
     "updraft": 0.35
   },
 
   "physics": {
-    "comment": "Твёрдое тело листа (масса 1, нормировано). pressure — коэффициент давления: при 110 лист-ладонь 30 см падает со скоростью ~1.3 м/с. massOffset — сдвиг центра масс к черешку (доля длины). restTime — секунд покоя у земли до «лежит». liftSpeed — ветер, поднимающий лежащие.",
+    "comment": "Твёрдое тело листа (масса 1, нормировано). pressure — коэффициент давления: при 110 лист-ладонь 30 см падает со скоростью ~1.3 м/с. leadShift — смещение центра давления к ведущему краю: без него лист падает ребром, как дротик. massOffset — сдвиг центра масс к черешку (доля длины). restTime — секунд покоя у земли до «лежит». liftSpeed — ветер, поднимающий лежащие.",
     "gravity": 9.81,
     "pressure": 110,
+    "leadShift": 0.5,
     "skin": 4,
     "angDampQuad": 0.35,
     "angDampLin": 0.6,
@@ -138,21 +184,23 @@
   },
 
   "field": {
-    "comment": "Объём полёта: глубина от камеры depth (м), полуширина растёт с глубиной (halfWidthPerDepth × глубина), высота спавна. Лимиты — раздел 4.6.",
-    "depth": [1.2, 28],
-    "halfWidthPerDepth": 0.9,
-    "spawnHeight": [4, 9],
+    "comment": "Объём полёта: глубина от камеры depth (м), полуширина растёт с глубиной (halfWidthPerDepth × глубина), высота спавна. Лимиты — раздел 4.6. lodDistance — границы уровней детализации (м): ближе первой 24 сегмента с торцом, до второй 12, дальше 6 без торца.",
+    "depth": [1.5, 16],
+    "halfWidthPerDepth": 0.8,
+    "spawnHeight": [5, 12],
     "capacityPerKind": 120,
     "maxFlying": 120,
     "maxGround": 60,
-    "autoSpawnPerSec": 0.6,
-    "initial": 70,
+    "autoSpawnPerSec": 4.5,
+    "initial": 80,
+    "lodDistance": [4, 10],
     "substeps": 4,
     "seed": 3
   },
 
   "occluders": {
-    "comment": "Невидимые заслонки глубины на месте нарисованных объектов. base — точка касания земли в долях экрана (x, y сверху) при 16:9, top — доля высоты экрана, где верх объекта; width — доля ширины экрана (для box); radius, cap, depth — метры. Показать: ?occ=1.",
+    "enabled": true,
+    "comment": "Невидимые заслонки глубины на месте нарисованных объектов. base — точка касания земли в долях экрана (x, y сверху) при 16:9, top — доля высоты экрана, где верх объекта; width — доля ширины экрана (для box); radius, cap, depth — метры. distance — глубина в метрах вместо base[1], bottom — доля высоты экрана, ниже которой ствол скрыт кустами (для стволов: их точка касания земли на картине не видна). Показать: ?occ=1.",
     "items": [
       { "name": "фонарь левый ближний", "type": "cylinder", "base": [0.3156, 0.687], "top": 0.305, "radius": 0.07, "cap": 0.38 },
       { "name": "фонарь правый ближний", "type": "cylinder", "base": [0.7266, 0.676], "top": 0.347, "radius": 0.06, "cap": 0.34 },
@@ -161,11 +209,12 @@
       { "name": "скамейка левая", "type": "box", "base": [0.172, 0.755], "top": 0.615, "width": 0.156, "depth": 0.7 },
       { "name": "скамейка правая", "type": "box", "base": [0.797, 0.718], "top": 0.611, "width": 0.099, "depth": 0.6 },
       { "name": "кусты слева", "type": "box", "base": [0.21, 0.66], "top": 0.52, "width": 0.17, "depth": 1.5 },
-      { "name": "кусты справа", "type": "box", "base": [0.80, 0.655], "top": 0.53, "width": 0.24, "depth": 1.5 },
-      { "name": "ствол клёна слева", "type": "cylinder", "base": [0.042, 0.62], "top": 0.0, "radius": 0.45 },
-      { "name": "берёза слева", "type": "cylinder", "base": [0.245, 0.60], "top": 0.0, "radius": 0.16 },
-      { "name": "берёза справа", "type": "cylinder", "base": [0.875, 0.615], "top": 0.0, "radius": 0.22 },
-      { "name": "берёза справа вторая", "type": "cylinder", "base": [0.793, 0.60], "top": 0.0, "radius": 0.14 }
+      { "name": "кусты справа", "type": "box", "base": [0.8, 0.655], "top": 0.53, "width": 0.24, "depth": 1.5 },
+      { "name": "ствол клёна слева", "type": "cylinder", "base": [0.085, 0.62], "top": 0, "radius": 0.19, "distance": 4, "bottom": 0.62 },
+      { "name": "берёза слева первая", "type": "cylinder", "base": [0.21, 0.52], "top": 0, "radius": 0.27, "distance": 14, "bottom": 0.52 },
+      { "name": "берёза слева вторая", "type": "cylinder", "base": [0.25, 0.52], "top": 0, "radius": 0.23, "distance": 12, "bottom": 0.52 },
+      { "name": "берёза справа", "type": "cylinder", "base": [0.877, 0.555], "top": 0, "radius": 0.25, "distance": 9, "bottom": 0.555 },
+      { "name": "берёза справа вторая", "type": "cylinder", "base": [0.795, 0.57], "top": 0, "radius": 0.21, "distance": 14, "bottom": 0.57 }
     ]
   },
 

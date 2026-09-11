@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import path from 'node:path';
 import fs from 'node:fs';
+import { formatSeason } from './season-format.mjs';
 
 // Dev-панель сцены (Shift+D) шлёт POST /__season — пишем параметры обратно в seasons/autumn.json.
 // Только в dev-режиме; в сборке эндпоинта нет.
@@ -16,7 +17,7 @@ function seasonWriter(): Plugin {
           try {
             const data = JSON.parse(body);
             const file = path.resolve(__dirname, '..', 'seasons', 'autumn.json');
-            fs.writeFileSync(file, JSON.stringify(data, null, 2) + '\n');
+            fs.writeFileSync(file, formatSeason(data));
             res.setHeader('content-type', 'application/json');
             res.end('{"ok":true}');
           } catch (e) {

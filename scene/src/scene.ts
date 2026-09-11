@@ -9,6 +9,10 @@ import { makeLighting } from './lighting';
 import { makeMidTrees } from './midTrees';
 import { makeBranchLeaves } from './branch-leaves';
 import { makeTestLeaf } from './test-leaf';
+import { Wind } from './wind';
+import { LeafField } from './leaf-field';
+import { makeOccluders } from './occluders';
+import { makeDevPanel } from './dev-panel';
 import { makeGround } from './ground';
 import { loadBackdrop } from './backdrop';
 import { makeComposite } from './composite';
@@ -20,6 +24,10 @@ export interface LivingScene {
   camera: THREE.PerspectiveCamera;
   /** Юниформы финального композита — для отладки из консоли. */
   composite: Record<string, THREE.IUniform>;
+  wind: Wind;
+  field: LeafField;
+  /** Прогнать физику на dt секунд без рендера (автотесты). */
+  simulate(seconds: number, step?: number): void;
   /** Отрисовать один кадр вручную (для скриншотов и тестов). */
   renderOnce(): void;
   start(): void;
@@ -63,15 +71,32 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
     updaters.push((t) => branchLeaves.update(t));
   }
   scene.add(makeGround(season));
+  // размещение по точке экрана требует актуальных матриц камеры и пропорций экрана
+  camera.aspect = (canvas.clientWidth || window.innerWidth) / (canvas.clientHeight || window.innerHeight);
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);
   if (season.testLeaf.enabled) {
-    // размещение по точке экрана требует актуальных матриц камеры и пропорций экрана
-    camera.aspect = (canvas.clientWidth || window.innerWidth) / (canvas.clientHeight || window.innerHeight);
-    camera.updateProjectionMatrix();
-    camera.updateMatrixWorld(true);
     const leaf = await makeTestLeaf(season, camera, import.meta.env.BASE_URL);
     scene.add(leaf.mesh);
     updaters.push((t) => leaf.update(t));
   }
+  // ── ветер, листья, заслонки глубины (этап 2, часть 3) ──
+  const wind = new Wind(season.wind, season.field.seed, 3);
+  const field = new LeafField(season, wind, camera, season.field.seed);
+  scene.add(field.group);
+  if (season.occluders.enabled) scene.add(makeOccluders(season, camera));
+  for (let i = 0; i < season.field.initial; i++) field.spawn();
+  const panel = makeDevPanel(season, {
+    spawn(n) { for (let i = 0; i < n; i++) field.spawn(); },
+    setStrength(k) { wind.strength = k; },
+    stats() {
+      const b = wind.base;
+      return { ...field.stats, wind: `${Math.hypot(b.x, b.z).toFixed(1)} м/с${wind.gustActive ? ', порыв' : ''}, треугольников листьев ${field.stats.triangles.toLocaleString('ru')}` };
+    }
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'n' || e.key === 'N' || e.key === 'т' || e.key === 'Т') field.spawn();
+  });
 
   // ── постобработка: 3D-слой → тонмаппинг и sRGB → композит с задником ──
   const size = renderer.getDrawingBufferSize(new THREE.Vector2());
@@ -100,16 +125,24 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
   const timer = new THREE.Timer();
   let time = 0;
 
+  const stepWorld = (dt: number) => {
+    wind.update(dt);
+    field.step(dt);
+  };
   const renderFrame = (dt: number) => {
     time += dt;
+    stepWorld(dt);
     composite.update(time);
+    field.update(time);
     for (const u of updaters) u(time);
+    panel.frame();
     renderer.info.reset();
     composer.render();
   };
 
   return {
-    renderer, scene, camera, composite: cu,
+    renderer, scene, camera, composite: cu, wind, field,
+    simulate(seconds, step = 1 / 60) { for (let t = 0; t < seconds; t += step) stepWorld(step); },
     renderOnce() { renderFrame(0); },
     start() {
       renderer.setAnimationLoop(() => {

@@ -13,6 +13,7 @@ interface Field { path: (string | number)[]; label: string; min: number; max: nu
 
 const FIELDS: Field[] = [
   { path: ['physics', 'pressure'], label: 'давление', min: 5, max: 200, step: 1 },
+  { path: ['physics', 'leadShift'], label: 'центр давления', min: 0, max: 2, step: 0.05 },
   { path: ['physics', 'skin'], label: 'трение', min: 0, max: 20, step: 0.5 },
   { path: ['physics', 'angDampQuad'], label: 'демпф. вращ. кв.', min: 0, max: 2, step: 0.01 },
   { path: ['physics', 'angDampLin'], label: 'демпф. вращ. лин.', min: 0, max: 3, step: 0.05 },

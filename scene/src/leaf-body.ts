@@ -11,6 +11,7 @@ import type { LeafShape } from './leaf-shapes';
 export interface AeroCfg {
   gravity: number;
   pressure: number;      // коэффициент давления k: F = k·A·|v|·vn
+  leadShift: number;     // смещение центра давления к ведущему краю (0 — нет, 0.8 — сильное): даёт зигзаг и кувырок
   skin: number;          // касательное трение
   angDampQuad: number;   // квадратичное демпфирование вращения
   angDampLin: number;
@@ -29,7 +30,8 @@ export type LeafState = 'fly' | 'settling' | 'ground' | 'fading';
 const TMP = {
   v: new THREE.Vector3(), v2: new THREE.Vector3(), w: new THREE.Vector3(), n: new THREE.Vector3(),
   rp: new THREE.Vector3(), f: new THREE.Vector3(), F: new THREE.Vector3(), T: new THREE.Vector3(),
-  q: new THREE.Quaternion(), dq: new THREE.Quaternion(), local: new THREE.Vector3(), lowest: new THREE.Vector3()
+  q: new THREE.Quaternion(), dq: new THREE.Quaternion(), local: new THREE.Vector3(), lowest: new THREE.Vector3(),
+  Fn: new THREE.Vector3()
 };
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -45,15 +47,21 @@ export class LeafBody {
   /** выход для шейдера: направление потока в плоскости (x,y) и величина изгиба (z) */
   readonly bend = new THREE.Vector3(0, 1, 0);
   flutter = 0;
+  lod = 0;
+  slot = 0;
+  twist = 0;
+  readonly tint = new THREE.Color(1, 1, 1);
   /** опорные точки в локальной системе (x поперёк, y вдоль жилки, z нормаль), относительно центра масс */
   private points: THREE.Vector3[] = [];
   private areaPerPoint: number;
+  private halfSpan = 0.1;
   private invI = new THREE.Vector3();          // 1/I по осям (диагональный тензор в локальной системе)
   private I = new THREE.Vector3();
   private geomCenter = new THREE.Vector3();    // геометрический центр листа относительно центра масс (локально)
 
   constructor(readonly shape: LeafShape, readonly size: number, readonly scale: number, readonly kind: string,
-              readonly dry: number, readonly variant: number, readonly phase: number, readonly slot: number, cfg: AeroCfg) {
+              readonly dry: number, readonly variant: number, readonly phase: number, slot: number, cfg: AeroCfg) {
+    this.slot = slot;
     // размеры в метрах: длинная сторона bbox = size·scale
     const L = size * scale;
     const bw = (shape.bbox.x1 - shape.bbox.x0) * L, bh = (shape.bbox.y1 - shape.bbox.y0) * L;
@@ -75,6 +83,7 @@ export class LeafBody {
       const lx = mid[0] + px * s * halfW + ux * t * half, ly = mid[1] + py * s * halfW + uy * t * half;
       this.points.push(new THREE.Vector3(lx - com[0], ly - com[1], 0));
     }
+    this.halfSpan = Math.max(half, halfW);
     const area = bw * bh * 0.62;
     this.areaPerPoint = area / this.points.length;
     // пластина: масса 1 (нормировано); тензор по осям локальной системы
@@ -98,6 +107,7 @@ export class LeafBody {
     n.set(0, 0, 1).applyQuaternion(this.quat);
     let loadN = 0, lowest = Infinity;
     v2.set(0, 0, 0);
+    const Fn = TMP.Fn.set(0, 0, 0);                  // суммарная нормальная (давление) сила
     for (const p of this.points) {
       rp.copy(p).applyQuaternion(this.quat);
       // скорость точки = v + ω × r
@@ -109,6 +119,7 @@ export class LeafBody {
       // давление: сила против нормальной составляющей потока, ∝ |v|·vn
       const k = cfg.pressure * this.areaPerPoint * speed;
       f.copy(n).multiplyScalar(-k * vn);
+      Fn.add(f);
       // касательное трение
       f.addScaledVector(v, -cfg.skin * this.areaPerPoint * speed);
       F.add(f);
@@ -117,6 +128,22 @@ export class LeafBody {
       v2.add(v);
       const y = this.pos.y + rp.y;
       if (y < lowest) lowest = y;
+    }
+    // центр давления пластины смещён к ведущему краю на leadShift·полуразмах·cos(угла атаки):
+    // сила давления приложена не в центре, а ближе к краю, встречающему поток. Ребром вперёд
+    // лист лететь не может — раскачивается, отсюда зигзаг, кувырок и спираль.
+    {
+      const vr = TMP.lowest.copy(v2).multiplyScalar(1 / this.points.length);   // средняя относительная скорость
+      const vrn = vr.dot(n);
+      const vt = TMP.local.copy(vr).addScaledVector(n, -vrn);                 // касательная составляющая
+      const vtLen = vt.length(), vrLen = vr.length();
+      if (vtLen > 1e-4 && vrLen > 1e-4) {
+        // ведущий край — в направлении движения листа относительно воздуха (vt), сила там больше
+        const shift = cfg.leadShift * this.halfSpan * (vtLen / vrLen);
+        vt.multiplyScalar(shift / vtLen);
+        // сдвиг центра масс → геометрический центр уже учтён в rp; добавляем момент от переноса силы
+        T.add(TMP.f.crossVectors(vt, Fn));
+      }
     }
     // земля: мягкий контакт самой нижней точки
     if (lowest < groundY) {

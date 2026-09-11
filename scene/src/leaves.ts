@@ -22,15 +22,17 @@ export class LeafBatch {
   readonly mesh: THREE.InstancedMesh;
   readonly material: LeafMaterial;
   readonly capacity: number;
+  readonly triangles: number;
   count = 0;
   private params: THREE.InstancedBufferAttribute;
   private bends: THREE.InstancedBufferAttribute;
   private rects: THREE.InstancedBufferAttribute;
 
-  constructor(readonly shape: LeafShape, readonly atlas: LeafAtlas, profile: LeafProfile, capacity: number, opts: { size: number; translucency?: number; segments?: number; paperWarm?: number; rim?: number }) {
+  constructor(readonly shape: LeafShape, readonly atlas: LeafAtlas, profile: LeafProfile, capacity: number, opts: { size: number; translucency?: number; segments?: number; noRim?: boolean; paperWarm?: number; rim?: number }) {
     this.capacity = capacity;
-    const geo = buildLeafGeometry(shape, { segments: opts.segments ?? 24 });
+    const geo = buildLeafGeometry(shape, { segments: opts.segments ?? 24, noRim: opts.noRim });
     geo.scale(opts.size, opts.size, opts.size);
+    this.triangles = geo.index ? geo.index.count / 3 : 0;
     this.params = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
     this.bends = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
     this.rects = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);

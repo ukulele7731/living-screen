@@ -17,6 +17,7 @@ import type { LeafShape } from './leaf-shapes';
 export interface LeafGeometryOptions {
   segments?: number;      // сетка по длинной стороне (в центре); по краю — вдвое плотнее
   thickness?: number;     // толщина в единицах листа (длинная сторона = 1)
+  noRim?: boolean;        // без торца — для дальних уровней детализации (толщина всё равно не видна)
 }
 
 type P = [number, number];
@@ -59,7 +60,9 @@ export function veinFrame(shape: LeafShape) {
 export function buildLeafGeometry(shape: LeafShape, opts: LeafGeometryOptions = {}): THREE.BufferGeometry {
   const N = opts.segments ?? 24;
   const thick = opts.thickness ?? 0.004;
-  const { bbox, contour } = shape;
+  const { bbox } = shape;
+  const contour = opts.noRim ? [] as P[] : shape.contour;
+  const clipContour = shape.contour;
   const w = bbox.x1 - bbox.x0, h = bbox.y1 - bbox.y0;
   const long = Math.max(w, h);
   const nx = Math.max(4, Math.round(N * w / long)), ny = Math.max(4, Math.round(N * h / long));
@@ -81,8 +84,8 @@ export function buildLeafGeometry(shape: LeafShape, opts: LeafGeometryOptions = 
   const vertex = (key: string, raw: P): V => {
     let v = verts.get(key);
     if (!v) {
-      const inside = pointInPolygon(raw, contour);
-      const near = nearestOnPolygon(raw, contour);
+      const inside = pointInPolygon(raw, clipContour);
+      const near = nearestOnPolygon(raw, clipContour);
       v = { p: inside ? raw : near.q, inside, edge: inside ? near.d : 0 };
       verts.set(key, v);
     }
@@ -163,7 +166,7 @@ export function buildLeafGeometry(shape: LeafShape, opts: LeafGeometryOptions = 
 
   // торец: контур по часовой (площадь со знаком < 0) → нормаль наружу = (ey, −ex)
   let area = 0;
-  for (let i = 0; i < contour.length; i++) {
+    for (let i = 0; i < contour.length; i++) {
     const a = contour[i], b = contour[(i + 1) % contour.length];
     area += a[0] * b[1] - b[0] * a[1];
   }
