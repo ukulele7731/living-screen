@@ -49,7 +49,7 @@ export class Wind {
     this.nextGust = 3 + this.r() * 5;
     for (let i = 0; i < cfg.vortices.count; i++) {
       this.vortices.push({
-        pos: new THREE.Vector3((this.r() - 0.5) * 30, 1.5 + this.r() * 4, -4 - this.r() * 20),
+        pos: new THREE.Vector3((this.r() - 0.5) * 30, 1.5 + this.r() * 4, -4 - this.r() * (cfg.gust.reach - 6)),
         radius: cfg.vortices.radius[0] + this.r() * (cfg.vortices.radius[1] - cfg.vortices.radius[0]),
         strength: cfg.vortices.strength[0] + this.r() * (cfg.vortices.strength[1] - cfg.vortices.strength[0]),
         boost: 1, boostEnd: 0
@@ -77,15 +77,24 @@ export class Wind {
     this.base.lerpVectors(this.baseFrom, this.baseTo, k);
     // порывы
     if (!this.gust && t > this.nextGust) {
-      const dir = this.base.clone();
-      if (dir.lengthSq() < 1e-4) dir.set(1, 0, 0);
-      dir.normalize();
-      dir.y = 0.12 + this.r() * 0.15;                          // порыв чуть вверх — поднимает лежащие
+      const dir = new THREE.Vector3();
+      const toCamera = this.r() < c.gust.toCamera;
+      if (toCamera) {
+        // порыв вдоль аллеи к зрителю: приходит с дальнего конца, волной поднимает листья
+        // сначала вдали, потом ближе — так видна глубина
+        const ang = (90 + (this.r() - 0.5) * 50) * Math.PI / 180;
+        dir.set(Math.cos(ang), 0, Math.sin(ang));
+      } else {
+        dir.copy(this.base);
+        if (dir.lengthSq() < 1e-4) dir.set(1, 0, 0);
+        dir.normalize();
+      }
+      dir.y = c.gust.rise[0] + this.r() * (c.gust.rise[1] - c.gust.rise[0]);   // порыв вверх — поднимает высоко
       dir.normalize();
       const speed = c.gust.speed[0] + this.r() * (c.gust.speed[1] - c.gust.speed[0]);
       this.gust = {
         t0: t, dur: c.gust.duration[0] + this.r() * (c.gust.duration[1] - c.gust.duration[0]),
-        speed, dir, s0: -25, width: c.gust.width, vFront: speed * 1.3
+        speed, dir, s0: toCamera ? -c.gust.reach : -30, width: c.gust.width, vFront: speed * 1.1
       };
     }
     if (this.gust && t > this.gust.t0 + this.gust.dur + 2) {
@@ -98,8 +107,8 @@ export class Wind {
       v.pos.x += Math.sin(t * 0.13 + v.radius) * dt * 0.4;
       if (v.pos.x > 22) v.pos.x = -22;
       if (v.pos.x < -22) v.pos.x = 22;
-      if (v.pos.z > 2) v.pos.z = -24;
-      if (v.pos.z < -26) v.pos.z = -2;
+      if (v.pos.z > 2) v.pos.z = -c.gust.reach;
+      if (v.pos.z < -c.gust.reach - 2) v.pos.z = -2;
       if (t > v.boostEnd) {
         if (this.r() < dt / c.vortices.boostEvery) { v.boost = 2.2; v.boostEnd = t + 5; } else v.boost = 1;
       }
@@ -114,7 +123,7 @@ export class Wind {
     if (this.gust) {
       const g = this.gust;
       const age = t - g.t0;
-      const env = smoothstep(0, 0.6, age) * (1 - smoothstep(g.dur - 0.8, g.dur + 1.5, age));
+      const env = smoothstep(0, 0.6, age) * (1 - smoothstep(g.dur - 0.8, g.dur + 2.0, age));
       const s = p.x * g.dir.x + p.z * g.dir.z;
       const front = g.s0 + g.vFront * age;
       const band = Math.exp(-Math.pow((s - front) / (g.width * 0.5), 2));
@@ -128,7 +137,7 @@ export class Wind {
       const sw = v.strength * v.boost * fall * (r / v.radius) / Math.max(0.3, r / v.radius);
       out.x += -dz / (r + 0.1) * sw;
       out.z += dx / (r + 0.1) * sw;
-      out.y += 0.35 * sw;                                    // вихрь чуть поднимает
+      out.y += c.vortices.rise * sw;                         // вихрь поднимает (столб)
     }
     // curl noise — мелкая турбулентность, есть составляющая по z
     const sc = c.turbulence.scale, e = 0.5, tt = t * c.turbulence.speed;
@@ -145,7 +154,10 @@ export class Wind {
     // восходящий поток над «тёплой» дорожкой
     const over = Math.exp(-(p.x * p.x) / (this.pathHalfWidth * this.pathHalfWidth * 2));
     out.y += c.updraft * over * smoothstep(0, 2, p.y) * (1 - smoothstep(4, 8, p.y));
-    return out.multiplyScalar(this.strength);
+    // пограничный слой: у самой земли ветер слабее — лежащие листья не ползут по дорожке,
+    // а поднимаются только когда порыв (проверяется на высоте ~1 м) их подхватывает
+    const bl = 0.12 + 0.88 * smoothstep(0, 1.2, p.y);
+    return out.multiplyScalar(this.strength * bl);
   }
 
   get gustActive(): boolean { return !!this.gust; }

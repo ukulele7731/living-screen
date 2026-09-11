@@ -49,6 +49,12 @@ export class LeafBody {
   flutter = 0;
   lod = 0;
   slot = 0;
+  /** ambient — фоновый лист сцены, hero — «главный» (тестовый по N, позже — детский) */
+  role: 'ambient' | 'hero' = 'ambient';
+  /** индивидуальный порог взлёта с земли (доля liftSpeed): не все листья взлетают разом */
+  liftBias = 1;
+  /** добавка к ветру только для этого листа (главные держатся у камеры), м/с */
+  readonly steer = new THREE.Vector3();
   twist = 0;
   readonly tint = new THREE.Color(1, 1, 1);
   /** опорные точки в локальной системе (x поперёк, y вдоль жилки, z нормаль), относительно центра масс */
@@ -113,7 +119,7 @@ export class LeafBody {
       // скорость точки = v + ω × r
       v.crossVectors(this.angVel, rp).add(this.vel);
       wind.sample(TMP.lowest.copy(this.pos).add(rp), w);
-      v.sub(w);                                      // относительная скорость воздуха (лист относительно воздуха)
+      v.sub(w).sub(this.steer);                                      // относительная скорость воздуха (лист относительно воздуха)
       const speed = v.length();
       const vn = v.dot(n);
       // давление: сила против нормальной составляющей потока, ∝ |v|·vn
@@ -150,9 +156,19 @@ export class LeafBody {
       const pen = groundY - lowest;
       const fy = cfg.groundSpring * pen - cfg.groundDamp * this.vel.y;
       F.y += Math.max(0, fy);
-      F.x -= this.vel.x * cfg.groundFriction;
-      F.z -= this.vel.z * cfg.groundFriction;
+      // трение о землю; медленный лист «цепляется» — трение покоя сильнее
+      const fr = cfg.groundFriction * (this.vel.lengthSq() < 0.5 ? 4 : 1);
+      F.x -= this.vel.x * fr;
+      F.z -= this.vel.z * fr;
       this.angVel.multiplyScalar(Math.max(0, 1 - dt * 6));
+    }
+    // устойчивость при сильном ветре и больших dt: аэродинамика за подшаг не может
+    // разогнать лист дальше скорости воздуха — импульс ограничен средней относительной скоростью
+    {
+      const vr = TMP.lowest.copy(v2).multiplyScalar(1 / this.points.length);
+      const Fa = TMP.local.copy(F).add(TMP.f.set(0, cfg.gravity, 0));   // без гравитации и земли (земля учтена ниже)
+      const imp = Fa.length() * dt, lim = vr.length() * 0.9 + 0.05;
+      if (imp > lim) { F.sub(Fa); F.addScaledVector(Fa, lim / imp); }
     }
     // интегрирование: скорость, положение
     this.vel.addScaledVector(F, dt);
@@ -209,6 +225,7 @@ export class LeafBody {
     // момент вокруг оси, перпендикулярной ветру: подветренный край вверх
     const axis = TMP.w.crossVectors(UP, dir).normalize();
     this.angVel.copy(axis).multiplyScalar(-(3 + r() * 3));
-    this.vel.set(wind.x * 0.35, 0.9 + r() * 1.2, wind.z * 0.35);
+    const wl = Math.hypot(wind.x, wind.z);
+    this.vel.set(wind.x * 0.4, 1.0 + r() * 1.0 + wl * 0.25, wind.z * 0.4);
   }
 }

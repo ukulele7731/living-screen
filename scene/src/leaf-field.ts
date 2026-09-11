@@ -13,6 +13,8 @@ import type { Wind } from './wind';
 import { groundHeight } from './ground';
 
 export interface SpawnOptions {
+  /** ambient — фоновый лист (мельче, приглушённый, живёт в глубине кадра), hero — главный: крупный, яркий, летит к камере */
+  role?: 'ambient' | 'hero';
   kind?: string;
   pos?: THREE.Vector3;
   vel?: THREE.Vector3;
@@ -66,12 +68,24 @@ export class LeafField {
 
   get aeroCfg(): AeroCfg { return this.aero; }
 
-  /** Случайная точка в объёме полёта: по всей глубине кадра, ширина — по перспективе. */
-  randomSpawnPoint(out: THREE.Vector3): THREE.Vector3 {
+  /** Фоновый лист рождается в кронах деревьев вдоль всей аллеи: по обе стороны дорожки,
+   *  на высоте крон, от ближних деревьев до дальних — дальние видны как мелкие точки,
+   *  и по ним читается глубина. */
+  randomSpawnPoint(out: THREE.Vector3, role: 'ambient' | 'hero' = 'ambient'): THREE.Vector3 {
     const f = this.season.field;
-    const z = -(f.depth[0] + Math.pow(this.r(), 1.6) * (f.depth[1] - f.depth[0]));   // ближе к камере — чаще
-    const halfW = Math.abs(z) * f.halfWidthPerDepth + 1;
-    out.set((this.r() * 2 - 1) * halfW, f.spawnHeight[0] + this.r() * (f.spawnHeight[1] - f.spawnHeight[0]), z);
+    const c = role === 'hero' ? f.hero : f.ambient;
+    const z = -(c.depth[0] + Math.pow(this.r(), c.depthBias) * (c.depth[1] - c.depth[0]));
+    let x: number;
+    if (role === 'hero') {
+      x = (this.r() * 2 - 1) * f.hero.halfWidth;
+    } else {
+      // деревья стоят по сторонам аллеи: |x| от края дорожки до глубины кроны, редко — над дорожкой
+      const side = this.r() < 0.5 ? -1 : 1;
+      const overPath = this.r() < f.ambient.overPath;
+      x = overPath ? (this.r() * 2 - 1) * this.wind.pathHalfWidth
+        : side * (this.wind.pathHalfWidth + this.r() * f.ambient.treeDepth);
+    }
+    out.set(x, c.height[0] + this.r() * (c.height[1] - c.height[0]), z);
     return out;
   }
 
@@ -94,12 +108,14 @@ export class LeafField {
   }
 
   spawn(opts: SpawnOptions = {}): LeafBody | null {
+    const role = opts.role ?? 'ambient';
+    const rc = role === 'hero' ? this.season.field.hero : this.season.field.ambient;
     const kind = opts.kind ?? LEAF_KINDS[Math.floor(this.r() * LEAF_KINDS.length)];
     const set = this.kinds.get(kind);
     if (!set) return null;
     const sp = this.season.leaves.species[kind as keyof typeof this.season.leaves.species];
-    const scale = opts.scale ?? (0.85 + this.r() * 0.35);
-    const pos = opts.pos ?? this.randomSpawnPoint(this.tmp);
+    const scale = opts.scale ?? (rc.scale[0] + this.r() * (rc.scale[1] - rc.scale[0]));
+    const pos = opts.pos ?? this.randomSpawnPoint(this.tmp, role);
     const wantLod = pos.distanceTo(this.camera.position) < this.season.field.lodDistance[0] ? 0
       : pos.distanceTo(this.camera.position) < this.season.field.lodDistance[1] ? 1 : 2;
     const packed = this.takeSlot(kind, wantLod);
@@ -108,12 +124,17 @@ export class LeafField {
     const body = new LeafBody(LEAF_SHAPES[kind], this.season.leaves.baseSize * sp.size, scale, kind,
       opts.dry ?? this.r() * 0.8, opts.variant ?? Math.floor(this.r() * set.atlas.variants), this.r() * 6.28, slot, this.aero);
     body.lod = lod;
+    body.role = role;
     body.pos.copy(pos);
-    if (opts.vel) body.vel.copy(opts.vel); else body.vel.set((this.r() - 0.5) * 0.6, -0.2, (this.r() - 0.5) * 0.4);
+    if (opts.vel) body.vel.copy(opts.vel);
+    else if (role === 'hero') body.vel.set((this.r() - 0.5) * 0.8, -0.2, 0.6 + this.r() * 0.8);   // главный — сразу к камере
+    else body.vel.set((this.r() - 0.5) * 0.6, -0.2, (this.r() - 0.5) * 0.4);
     body.quat.setFromEuler(new THREE.Euler(this.r() * 6.28, this.r() * 6.28, this.r() * 6.28));
     body.angVel.set((this.r() - 0.5) * 3, (this.r() - 0.5) * 3, (this.r() - 0.5) * 3);
     body.twist = (this.r() - 0.5) * 0.4;
-    body.tint.setHSL(0.08 + this.r() * 0.06, 0.5, 0.55).lerp(new THREE.Color(1, 1, 1), 0.7);
+    body.liftBias = 0.75 + this.r() * 0.8;
+    if (role === 'hero') body.tint.set(1, 1, 1);                       // рисунок как есть, во всю яркость
+    else body.tint.setHSL(0.08 + this.r() * 0.06, 0.5, 0.55).lerp(new THREE.Color(1, 1, 1), 0.7).multiplyScalar(this.season.field.ambient.tint);
     this.bodies.push(body);
     this.writeFull(body);
     this.stats.spawned++;
@@ -153,6 +174,18 @@ export class LeafField {
     this.writeFull(body);
   }
 
+  /** Главный лист держится в зоне перед камерой: к ветру добавляется слабое течение
+   *  к точке hero.focus (за её пределы порыв всё равно выносит — но лист возвращается). */
+  private steerHero(b: LeafBody) {
+    const h = this.season.field.hero;
+    const t = this.tmp.set(THREE.MathUtils.clamp(b.pos.x, -h.focus[0], h.focus[0]), h.focus[1], -h.focus[2]).sub(b.pos);
+    const d = t.length();
+    if (d < 1e-3) { b.steer.set(0, 0, 0); return; }
+    // сила растёт с удалением от зоны: рядом — почти нет, далеко — до steer м/с
+    const k = h.steer * THREE.MathUtils.smoothstep(d, 1.0, 6);
+    b.steer.copy(t).multiplyScalar(k / d);
+  }
+
   /** Физика: dt кадра делится на подшаги. */
   step(dt: number) {
     const cfg = this.aero, f = this.season.field;
@@ -165,8 +198,14 @@ export class LeafField {
       this.spawnAcc -= 1;
       if (this.stats.flying < f.maxFlying) this.spawn();
     }
+    const near2 = f.ambient.nearFade * f.ambient.nearFade;
     for (const b of this.bodies.slice()) {
+      // фоновый лист, подлетевший к камере, растворяется — на первом плане только главные
+      if (b.role === 'ambient' && b.state !== 'fading' && b.pos.distanceToSquared(this.camera.position) < near2) {
+        b.state = 'fading';
+      }
       if (b.state === 'fly') {
+        if (b.role === 'hero') this.steerHero(b); else b.steer.set(0, 0, 0);
         for (let s = 0; s < sub; s++) {
           const gy = groundHeight(b.pos.x, b.pos.z);
           const lowest = b.step(h, this.wind, cfg, gy);
@@ -174,16 +213,19 @@ export class LeafField {
           if (lowest < gy + 0.03 && slow) b.restTimer += h; else b.restTimer = 0;
         }
         if (b.restTimer > cfg.restTime) { b.state = 'ground'; b.restTimer = 0; }
-        // улетел далеко — убираем
-        if (b.pos.y < -2 || Math.abs(b.pos.x) > 60 || b.pos.z > 4 || b.pos.z < -80) { this.remove(b); continue; }
+        // улетел далеко — убираем (главные держатся у камеры, их предел шире)
+        const zLim = b.role === 'hero' ? 12 : 4;
+        if (b.pos.y < -2 || Math.abs(b.pos.x) > 60 || b.pos.z > zLim || b.pos.z < -80) { this.remove(b); continue; }
         flying++;
       } else if (b.state === 'ground') {
         b.settle(dt);
         ground++;
         // порыв поднимает лежащие: сначала край, потом весь лист
-        this.wind.sample(b.pos, windAt);
+        this.wind.sample(windAt.copy(b.pos).setY(b.pos.y + 1.0), windAt);   // ветер над листом, не в пограничном слое
         const wl = Math.hypot(windAt.x, windAt.z);
-        if (wl > cfg.liftSpeed && this.r() < dt * (wl - cfg.liftSpeed) * 0.8) b.lift(windAt, this.r);
+        const eager = b.role === 'hero' ? 1.0 : 0.3;                  // главные взлетают охотнее
+        const need = cfg.liftSpeed * b.liftBias;
+        if (wl > need && this.r() < dt * (wl - need) * eager) b.lift(windAt, this.r);
       } else if (b.state === 'fading') {
         b.fade -= dt;
         if (b.fade <= 0) { this.remove(b); continue; }
@@ -193,9 +235,11 @@ export class LeafField {
     // ковёр: лимит лежащих — самые старые уходят «под верхние»
     if (ground > f.maxGround) {
       let extra = ground - f.maxGround;
-      for (const b of this.bodies) {
-        if (extra <= 0) break;
-        if (b.state === 'ground') { b.state = 'fading'; extra--; }
+      for (const role of ['ambient', 'hero'] as const) {                // сначала уходят фоновые
+        for (const b of this.bodies) {
+          if (extra <= 0) break;
+          if (b.state === 'ground' && b.role === role) { b.state = 'fading'; extra--; }
+        }
       }
     }
     this.stats.flying = flying;

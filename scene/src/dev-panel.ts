@@ -22,14 +22,20 @@ const FIELDS: Field[] = [
   { path: ['physics', 'liftSpeed'], label: 'взлёт с земли, м/с', min: 0.5, max: 8, step: 0.1 },
   { path: ['wind', 'base', 'speed', 0], label: 'фон мин, м/с', min: 0, max: 4, step: 0.1 },
   { path: ['wind', 'base', 'speed', 1], label: 'фон макс, м/с', min: 0, max: 6, step: 0.1 },
-  { path: ['wind', 'gust', 'speed', 1], label: 'порыв макс, м/с', min: 0, max: 10, step: 0.1 },
+  { path: ['wind', 'gust', 'speed', 0], label: 'порыв мин, м/с', min: 0, max: 15, step: 0.1 },
+  { path: ['wind', 'gust', 'speed', 1], label: 'порыв макс, м/с', min: 0, max: 20, step: 0.1 },
+  { path: ['wind', 'gust', 'rise', 1], label: 'порыв вверх (доля)', min: 0, max: 1, step: 0.05 },
+  { path: ['wind', 'gust', 'toCamera'], label: 'порывов к камере (доля)', min: 0, max: 1, step: 0.05 },
   { path: ['wind', 'gust', 'interval', 0], label: 'порыв интервал мин', min: 2, max: 60, step: 1 },
   { path: ['wind', 'gust', 'interval', 1], label: 'порыв интервал макс', min: 2, max: 90, step: 1 },
   { path: ['wind', 'turbulence', 'strength'], label: 'турбулентность', min: 0, max: 3, step: 0.05 },
   { path: ['wind', 'vortices', 'strength', 1], label: 'вихри макс', min: 0, max: 6, step: 0.1 },
   { path: ['wind', 'updraft'], label: 'восходящий поток', min: 0, max: 2, step: 0.05 },
   { path: ['field', 'autoSpawnPerSec'], label: 'листьев в секунду', min: 0, max: 5, step: 0.1 },
-  { path: ['field', 'maxFlying'], label: 'летящих макс', min: 0, max: 300, step: 5 }
+  { path: ['field', 'maxFlying'], label: 'летящих макс', min: 0, max: 300, step: 5 },
+  { path: ['field', 'ambient', 'tint'], label: 'фоновые: яркость', min: 0.3, max: 1, step: 0.05 },
+  { path: ['field', 'ambient', 'scale', 1], label: 'фоновые: размер макс', min: 0.3, max: 1.5, step: 0.05 },
+  { path: ['field', 'ambient', 'nearFade'], label: 'фоновые: не ближе, м', min: 0, max: 6, step: 0.1 }
 ];
 
 function get(obj: unknown, path: (string | number)[]): number {
@@ -62,7 +68,7 @@ export function makeDevPanel(season: Season, hooks: DevPanelHooks): { frame(): v
     <h3>Dev-панель <small>(Shift+D)</small></h3>
     <div class="row">
       <button data-str="0.15">штиль</button><button data-str="1" class="on">ветерок</button><button data-str="2.4">буря</button>
-      <button id="dp-spawn">+10 листьев</button>
+      <button id="dp-spawn">+10 главных листьев</button>
     </div>
     <div id="dp-fields"></div>
     <div class="row"><button id="dp-save">Сохранить в autumn.json</button><span id="dp-msg"></span></div>

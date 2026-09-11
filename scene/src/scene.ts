@@ -87,7 +87,7 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
   if (season.occluders.enabled) scene.add(makeOccluders(season, camera));
   for (let i = 0; i < season.field.initial; i++) field.spawn();
   const panel = makeDevPanel(season, {
-    spawn(n) { for (let i = 0; i < n; i++) field.spawn(); },
+    spawn(n) { for (let i = 0; i < n; i++) field.spawn({ role: 'hero' }); },
     setStrength(k) { wind.strength = k; },
     stats() {
       const b = wind.base;
@@ -95,7 +95,7 @@ export async function createScene(canvas: HTMLCanvasElement, devEl: HTMLElement)
     }
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'n' || e.key === 'N' || e.key === 'т' || e.key === 'Т') field.spawn();
+    if (e.key === 'n' || e.key === 'N' || e.key === 'т' || e.key === 'Т') field.spawn({ role: 'hero' });
   });
 
   // ── постобработка: 3D-слой → тонмаппинг и sRGB → композит с задником ──
