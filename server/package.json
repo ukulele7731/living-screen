@@ -12,9 +12,11 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "migrate": "tsx src/migrate.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.test.json",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
     "better-sqlite3": "^13.0.3",
     "fastify": "^5.12.5",
     "grammy": "^1.46.0",

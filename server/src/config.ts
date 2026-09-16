@@ -10,6 +10,7 @@ export interface Config {
   publicUrl: string;
   dataDir: string;            // база и картинки: data/db.sqlite, data/rooms/...
   minFreeMb: number;          // ниже этого /healthz даёт 503 — место кончается
+  defaultSeason: string;      // сезон новых комнат
   telegramBotToken: string;   // пусто — бот не запускается (шаг 3.4)
 }
 
@@ -31,6 +32,7 @@ export function loadConfig(): Config {
     publicUrl: opt('PUBLIC_URL', 'http://localhost:8080').replace(/\/+$/, ''),
     dataDir: path.resolve(opt('DATA_DIR', 'data')),
     minFreeMb: Number(opt('MIN_FREE_MB', '500')),
+    defaultSeason: opt('DEFAULT_SEASON', 'autumn'),
     telegramBotToken: opt('TELEGRAM_BOT_TOKEN', '')
   };
 }

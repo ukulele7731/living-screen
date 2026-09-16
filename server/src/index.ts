@@ -3,6 +3,7 @@
 import { loadConfig } from './config.js';
 import { makeServices, buildApp, closeServices } from './app.js';
 import { migrate } from './migrate.js';
+import { startSweeper } from './sweeper.js';
 
 const cfg = loadConfig();
 const services = makeServices(cfg);
@@ -10,6 +11,8 @@ const applied = migrate(services.db);
 const app = await buildApp(services);
 app.log.info(`данные: ${cfg.dataDir}`);
 if (applied.length) app.log.info(`миграции применены: ${applied.join(', ')}`);
+
+const stopSweeper = startSweeper(services, app.log);
 
 await app.listen({ port: cfg.port, host: cfg.host });
 
@@ -19,6 +22,7 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     if (stopping) return;
     stopping = true;
     app.log.info(`${sig}: останавливаемся`);
+    stopSweeper();
     await app.close();
     closeServices(services);
     process.exit(0);
