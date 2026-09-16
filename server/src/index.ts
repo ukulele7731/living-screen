@@ -1,15 +1,15 @@
-// Точка входа: настройки → миграции → приложение → слушаем порт. Остановка по SIGTERM/SIGINT
-// закрывает соединения (docker compose stop даёт 10 с).
+// Точка входа: настройки → база и миграции → приложение → слушаем порт. Остановка по
+// SIGTERM/SIGINT закрывает базу (docker compose stop даёт 10 с).
 import { loadConfig } from './config.js';
 import { makeServices, buildApp, closeServices } from './app.js';
 import { migrate } from './migrate.js';
 
 const cfg = loadConfig();
 const services = makeServices(cfg);
-const applied = await migrate(services.db);
+const applied = migrate(services.db);
 const app = await buildApp(services);
+app.log.info(`данные: ${cfg.dataDir}`);
 if (applied.length) app.log.info(`миграции применены: ${applied.join(', ')}`);
-await services.redis.connect().catch((e) => app.log.warn(`redis недоступен при старте: ${(e as Error).message}`));
 
 await app.listen({ port: cfg.port, host: cfg.host });
 
@@ -20,7 +20,7 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
     stopping = true;
     app.log.info(`${sig}: останавливаемся`);
     await app.close();
-    await closeServices(services);
+    closeServices(services);
     process.exit(0);
   });
 }

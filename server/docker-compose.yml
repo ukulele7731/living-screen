@@ -1,76 +1,28 @@
-# «Живой экран» — локальный и боевой стек одним файлом.
+# «Живой экран» — два контейнера: app (Node + SQLite + папка data/) и caddy (HTTPS, статика).
 #   cp .env.example .env && docker compose up -d --build
 #   curl http://localhost:8080/healthz
-# На VPS то же самое, только SITE_ADDRESS=домен и ключи хранилища от Timeweb/Selectel
-# (тогда сервисы minio и minio-init можно выключить: docker compose up -d app postgres redis caddy).
+# На VPS то же самое: SITE_ADDRESS=домен в .env и порты Caddy 80/443.
 name: living-screen
 
 services:
   app:
     build: .
     restart: unless-stopped
+    # PID 1 — настоящий init, а не node: зависший healthcheck внутри контейнера
+    # иначе оставляет зомби-процесс до перезапуска
+    init: true
     env_file: .env
-    depends_on:
-      postgres: { condition: service_healthy }
-      redis: { condition: service_healthy }
-      minio-init: { condition: service_completed_successfully }
+    environment:
+      DATA_DIR: /app/data
+    volumes:
+      # База и детские рисунки. Обычная папка, а не docker-том: бэкап — архивом, переезд — копированием.
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/healthz').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
-
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    env_file: .env
-    volumes:
-      - pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru"]
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  # Локальное S3-хранилище. На VPS — внешнее объектное хранилище, этот сервис не нужен.
-  minio:
-    image: minio/minio:latest
-    restart: unless-stopped
-    command: ["server", "/data", "--console-address", ":9001"]
-    env_file: .env
-    ports:
-      - "9001:9001"        # консоль MinIO: http://localhost:9001
-    volumes:
-      - miniodata:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-
-  # Один раз создаёт бакет и выходит.
-  minio-init:
-    image: minio/mc:latest
-    env_file: .env
-    depends_on:
-      minio: { condition: service_healthy }
-    entrypoint: >
-      /bin/sh -c "
-        mc alias set local http://minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD &&
-        mc mb --ignore-existing local/$$S3_BUCKET &&
-        mc version enable local/$$S3_BUCKET || true
-      "
+      start_period: 10s
 
   caddy:
     image: caddy:2-alpine
@@ -78,7 +30,6 @@ services:
     env_file: .env
     ports:
       - "8080:80"          # локально; на VPS заменить на "80:80" и "443:443"
-      - "443:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./www:/srv/www:ro
@@ -88,7 +39,5 @@ services:
       - app
 
 volumes:
-  pgdata:
-  miniodata:
   caddydata:
   caddyconfig:

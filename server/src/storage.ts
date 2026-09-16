@@ -1,26 +1,38 @@
-// Объектное хранилище S3 (раздел 5 server-spec.md): локально MinIO, на VPS — Timeweb/Selectel.
-// Бакет приватный, наружу — только подписанные ссылки (шаг 3.3). Здесь — клиент и проверка.
-import { S3Client, HeadBucketCommand } from '@aws-sdk/client-s3';
+// Картинки — папка data/ (раздел 5 server-spec.md): rooms/{code}/leaves/{id}/{tex|thumb|...}.
+// Наружу папка не торчит, файлы отдаёт сервер (шаг 3.3). Здесь — пути и проверка для /healthz.
+import fs from 'node:fs';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import type { Config } from './config.js';
-import { withTimeout } from './redis.js';
 
 export interface Storage {
-  client: S3Client;
-  bucket: string;
+  root: string;
+  minFreeMb: number;
+  /** абсолютный путь по ключу; ключ не может выйти за пределы data/ */
+  pathFor(key: string): string;
 }
 
 export function makeStorage(cfg: Config): Storage {
-  const client = new S3Client({
-    endpoint: cfg.s3.endpoint,
-    region: cfg.s3.region,
-    forcePathStyle: cfg.s3.forcePathStyle,
-    credentials: { accessKeyId: cfg.s3.accessKey, secretAccessKey: cfg.s3.secretKey },
-    requestHandler: { requestTimeout: 5_000, connectionTimeout: 3_000 }
-  });
-  return { client, bucket: cfg.s3.bucket };
+  const root = cfg.dataDir;
+  fs.mkdirSync(path.join(root, 'rooms'), { recursive: true });
+  return {
+    root,
+    minFreeMb: cfg.minFreeMb,
+    pathFor(key: string) {
+      const p = path.resolve(root, key);
+      if (!p.startsWith(root + path.sep)) throw new Error(`недопустимый ключ ${key}`);
+      return p;
+    }
+  };
 }
 
-/** Проверка для /healthz: бакет существует и доступен с нашими ключами. */
-export async function checkStorage(storage: Storage, timeoutMs = 3000): Promise<void> {
-  await withTimeout(storage.client.send(new HeadBucketCommand({ Bucket: storage.bucket })), timeoutMs, 's3 HeadBucket');
+/** Проверка для /healthz: в data/ можно писать, и на диске есть место. */
+export async function checkStorage(storage: Storage): Promise<{ freeMb: number }> {
+  const probe = path.join(storage.root, `.healthz-${process.pid}`);
+  await fsp.writeFile(probe, String(Date.now()));
+  await fsp.unlink(probe);
+  const st = await fsp.statfs(storage.root);
+  const freeMb = Math.floor((st.bavail * st.bsize) / 1024 / 1024);
+  if (freeMb < storage.minFreeMb) throw new Error(`на диске ${freeMb} МБ, нужно не меньше ${storage.minFreeMb}`);
+  return { freeMb };
 }

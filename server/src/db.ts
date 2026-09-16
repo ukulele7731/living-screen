@@ -1,27 +1,27 @@
-// PostgreSQL: один пул на процесс. Всё, что нельзя потерять, — здесь (раздел 4 server-spec.md).
-import pg from 'pg';
+// SQLite: один файл data/db.sqlite, режим WAL (читатели не ждут писателя), внешние ключи
+// включены. Всё, что нельзя потерять, — здесь (раздел 4 server-spec.md); счётчики лимитов —
+// в памяти процесса.
+import fs from 'node:fs';
+import path from 'node:path';
+import Database from 'better-sqlite3';
 import type { Config } from './config.js';
 
-export type Db = pg.Pool;
+export type Db = Database.Database;
 
 export function makeDb(cfg: Config): Db {
-  const pool = new pg.Pool({
-    connectionString: cfg.databaseUrl,
-    max: 10,
-    idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000,
-    application_name: 'living-screen'
-  });
-  pool.on('error', (err) => { console.error('[db] ошибка соединения в пуле:', err.message); });
-  return pool;
+  fs.mkdirSync(cfg.dataDir, { recursive: true });
+  const db = new Database(path.join(cfg.dataDir, 'db.sqlite'));
+  db.pragma('journal_mode = WAL');
+  db.pragma('synchronous = NORMAL');        // с WAL: не теряет ничего, кроме последних мс при отключении питания
+  db.pragma('foreign_keys = ON');
+  db.pragma('busy_timeout = 5000');
+  return db;
 }
 
-/** Проверка для /healthz: простой запрос с таймаутом. */
-export async function checkDb(db: Db, timeoutMs = 2000): Promise<void> {
-  const client = await db.connect();
-  try {
-    await client.query({ text: 'SELECT 1', query_timeout: timeoutMs } as pg.QueryConfig);
-  } finally {
-    client.release();
-  }
+/** Проверка для /healthz: база отвечает и не повреждена на уровне заголовка. */
+export function checkDb(db: Db): void {
+  const r = db.prepare('SELECT 1 AS ok').get() as { ok: number };
+  if (r.ok !== 1) throw new Error('база ответила не то');
+  const q = db.pragma('quick_check', { simple: true }) as string;
+  if (q !== 'ok') throw new Error(`quick_check: ${q}`);
 }

@@ -1,22 +1,20 @@
-// Сборка Fastify-приложения: сервисы (база, Redis, хранилище) и маршруты.
+// Сборка Fastify-приложения: сервисы (база, папка данных) и маршруты.
 // Отдельно от index.ts, чтобы тесты поднимали приложение без сети (app.inject).
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import type { Config } from './config.js';
 import { makeDb, type Db } from './db.js';
-import { makeRedis, type RedisClient } from './redis.js';
 import { makeStorage, type Storage } from './storage.js';
 import { healthRoutes } from './routes/health.js';
 
 export interface Services {
   cfg: Config;
   db: Db;
-  redis: RedisClient;
   storage: Storage;
   version: string;
 }
 
 export function makeServices(cfg: Config): Services {
-  return { cfg, db: makeDb(cfg), redis: makeRedis(cfg), storage: makeStorage(cfg), version: process.env.npm_package_version ?? '0.1.0' };
+  return { cfg, db: makeDb(cfg), storage: makeStorage(cfg), version: process.env.npm_package_version ?? '0.1.0' };
 }
 
 export async function buildApp(services: Services): Promise<FastifyInstance> {
@@ -36,8 +34,8 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
   return app;
 }
 
-export async function closeServices(services: Services): Promise<void> {
-  await Promise.allSettled([services.db.end(), services.redis.quit(), Promise.resolve(services.storage.client.destroy())]);
+export function closeServices(services: Services): void {
+  services.db.close();
 }
 
 declare module 'fastify' {

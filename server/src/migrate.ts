@@ -1,39 +1,27 @@
 // Миграции — простые SQL-файлы в migrations/, по имени по порядку (0001_init.sql, 0002_...).
-// Применяются при старте приложения в транзакции под advisory-lock, чтобы два экземпляра
-// не гонялись. Применённые запоминаются в schema_migrations. Отдельно: npm run migrate.
-import fs from 'node:fs/promises';
+// Применяются при старте, каждая в транзакции; применённые запоминаются в schema_migrations.
+// SQLite однопроцессный, поэтому блокировок между экземплярами не нужно. Отдельно: npm run migrate.
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Db } from './db.js';
 
-const LOCK_KEY = 7_331_001;   // произвольная константа для pg_advisory_lock
-
-export async function migrate(db: Db, dir = defaultDir()): Promise<string[]> {
-  const files = (await fs.readdir(dir)).filter((f) => /^\d+_.+\.sql$/.test(f)).sort();
+export function migrate(db: Db, dir = defaultDir()): string[] {
+  const files = fs.readdirSync(dir).filter((f) => /^\d+_.+\.sql$/.test(f)).sort();
+  db.exec(`CREATE TABLE IF NOT EXISTS schema_migrations (
+    name TEXT PRIMARY KEY, applied_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')))`);
+  const done = new Set((db.prepare('SELECT name FROM schema_migrations').all() as { name: string }[]).map((r) => r.name));
   const applied: string[] = [];
-  const client = await db.connect();
-  try {
-    await client.query('SELECT pg_advisory_lock($1)', [LOCK_KEY]);
-    await client.query(`CREATE TABLE IF NOT EXISTS schema_migrations (
-      name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())`);
-    const done = new Set((await client.query<{ name: string }>('SELECT name FROM schema_migrations')).rows.map((r) => r.name));
-    for (const f of files) {
-      if (done.has(f)) continue;
-      const sql = await fs.readFile(path.join(dir, f), 'utf8');
-      await client.query('BEGIN');
-      try {
-        await client.query(sql);
-        await client.query('INSERT INTO schema_migrations (name) VALUES ($1)', [f]);
-        await client.query('COMMIT');
-      } catch (e) {
-        await client.query('ROLLBACK');
-        throw new Error(`Миграция ${f} не применилась: ${(e as Error).message}`);
-      }
-      applied.push(f);
+  const mark = db.prepare('INSERT INTO schema_migrations (name) VALUES (?)');
+  for (const f of files) {
+    if (done.has(f)) continue;
+    const sql = fs.readFileSync(path.join(dir, f), 'utf8');
+    try {
+      db.transaction(() => { db.exec(sql); mark.run(f); })();
+    } catch (e) {
+      throw new Error(`Миграция ${f} не применилась: ${(e as Error).message}`);
     }
-  } finally {
-    await client.query('SELECT pg_advisory_unlock($1)', [LOCK_KEY]).catch(() => { /* соединение всё равно вернём */ });
-    client.release();
+    applied.push(f);
   }
   return applied;
 }
@@ -48,7 +36,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const { loadConfig } = await import('./config.js');
   const { makeDb } = await import('./db.js');
   const db = makeDb(loadConfig());
-  const applied = await migrate(db);
+  const applied = migrate(db);
   console.log(applied.length ? `применено: ${applied.join(', ')}` : 'миграций нет — схема актуальна');
-  await db.end();
+  db.close();
 }
