@@ -16,6 +16,9 @@ export interface LeafAtlas {
   variants: number;
   /** iUvRect для варианта: смещение и масштаб */
   rect(variant: number): [number, number, number, number];
+  /** Положить рисунок ребёнка (кадр по bbox вида, как отдаёт capture.js) в свободную ячейку;
+   *  возвращает номер варианта. Ячейки кончились — занимает самую старую из добавленных. */
+  addImage?(img: CanvasImageSource): number;
 }
 
 type P = [number, number];
@@ -81,6 +84,13 @@ export function veinHeightMm(shape: LeafShape, w: number, h: number, leafLongMm:
 
 /** Карта нормалей: рельеф жилок (мм, физический масштаб) + слабый рельеф штрихов из яркости. */
 export function normalMapFromCanvas(src: HTMLCanvasElement, lumStrength: number, veins?: { mm: Float32Array; mmPerPx: number }): THREE.CanvasTexture {
+  const [canvas] = makeCanvas(src.width, src.height);
+  renderNormalMap(src, lumStrength, veins, canvas);
+  return canvasTexture(canvas, false);
+}
+
+/** То же, но в готовый холст (чтобы обновлять атлас на месте, не меняя текстуру). */
+export function renderNormalMap(src: HTMLCanvasElement, lumStrength: number, veins: { mm: Float32Array; mmPerPx: number } | undefined, canvas: HTMLCanvasElement): void {
   const w = src.width, h = src.height;
   const sctx = src.getContext('2d')!;
   const d = sctx.getImageData(0, 0, w, h).data;
@@ -89,7 +99,7 @@ export function normalMapFromCanvas(src: HTMLCanvasElement, lumStrength: number,
     const lum = (d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114) / 255;
     hgt[i] = lum * lumStrength + (veins ? veins.mm[i] / veins.mmPerPx : 0);
   }
-  const [canvas, ctx] = makeCanvas(w, h);
+  const ctx = canvas.getContext('2d')!;
   const out = ctx.createImageData(w, h);
   const at = (x: number, y: number) => hgt[Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))];
   for (let y = 0; y < h; y++) {
@@ -103,7 +113,6 @@ export function normalMapFromCanvas(src: HTMLCanvasElement, lumStrength: number,
     }
   }
   ctx.putImageData(out, 0, 0);
-  return canvasTexture(canvas, false);
 }
 
 /** Атлас из готовой картинки (рисунок ребёнка из capture.js): один вариант, uv на весь кадр. */
@@ -121,10 +130,11 @@ export function atlasFromImage(img: HTMLImageElement, shape: LeafShape, leafLong
 }
 
 /** Нарисованный лист: градиент от черешка к кончику, пятна, жилки, тёмный край. */
-export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: number, leafLongMm = 300, cellW = 512): LeafAtlas {
+export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: number, leafLongMm = 300, cellW = 512, extraSlots = 6): LeafAtlas {
   const cellH = Math.round(cellW / shape.aspect);
   const variants = palettes.length;
-  const [canvas, ctx] = makeCanvas(cellW, cellH * variants);
+  const slots = variants + extraSlots;                        // запасные ячейки — под рисунки детей (демо без сервера)
+  const [canvas, ctx] = makeCanvas(cellW, cellH * slots);
   const noise = makeNoise2D(seed, 64);
   const { bbox, contour, vein } = shape;
   const bw = bbox.x1 - bbox.x0, bh = bbox.y1 - bbox.y0;
@@ -177,12 +187,27 @@ export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: 
   map.anisotropy = 8;
   // рельеф жилок один на все варианты: карта высот ячейки повторяется по строкам
   const cellMm = veinHeightMm(shape, cellW, cellH, leafLongMm);
-  const allMm = new Float32Array(cellW * cellH * variants);
-  for (let v = 0; v < variants; v++) allMm.set(cellMm, v * cellW * cellH);
-  const normalMap = normalMapFromCanvas(canvas, 0.35, { mm: allMm, mmPerPx: leafLongMm / cellW });
+  const allMm = new Float32Array(cellW * cellH * slots);
+  for (let v = 0; v < slots; v++) allMm.set(cellMm, v * cellW * cellH);
+  const veins = { mm: allMm, mmPerPx: leafLongMm / cellW };
+  const [normalCanvas] = makeCanvas(cellW, cellH * slots);
+  renderNormalMap(canvas, 0.35, veins, normalCanvas);
+  const normalMap = canvasTexture(normalCanvas, false);
   normalMap.wrapS = normalMap.wrapT = THREE.ClampToEdgeWrapping;
+  let nextSlot = variants;
   return {
     map, normalMap, variants,
-    rect(v) { return [0, 1 - (v + 1) / variants, 1, 1 / variants]; }
+    rect(v) { return [0, 1 - (v + 1) / slots, 1, 1 / slots]; },
+    addImage(img) {
+      if (extraSlots === 0) return 0;
+      const slot = nextSlot;
+      nextSlot = variants + ((nextSlot - variants + 1) % extraSlots);   // по кругу среди запасных
+      ctx.clearRect(0, slot * cellH, cellW, cellH);
+      ctx.drawImage(img, 0, slot * cellH, cellW, cellH);
+      map.needsUpdate = true;
+      renderNormalMap(canvas, 0.35, veins, normalCanvas);
+      normalMap.needsUpdate = true;
+      return slot;
+    }
   };
 }

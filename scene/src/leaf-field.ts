@@ -79,6 +79,13 @@ export class LeafField {
 
   get aeroCfg(): AeroCfg { return this.aero; }
 
+  /** Рисунок ребёнка (кадр по bbox вида, как отдаёт capture.js) → номер варианта текстуры вида. */
+  addLeafTexture(kind: string, img: CanvasImageSource): number {
+    const set = this.kinds.get(kind);
+    if (!set || !set.atlas.addImage) throw new Error(`вид «${kind}» не поддерживает свои текстуры`);
+    return set.atlas.addImage(img);
+  }
+
   /** Фоновый лист рождается в кронах деревьев вдоль всей аллеи: по обе стороны дорожки,
    *  на высоте крон, от ближних деревьев до дальних — дальние видны как мелкие точки,
    *  и по ним читается глубина. */

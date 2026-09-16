@@ -30,10 +30,30 @@ function seasonWriter(): Plugin {
   };
 }
 
+// vendor/paper-aquarium/capture.js лежит вне scene/ и не копируется в наш код: в dev отдаём
+// файл как есть по /vendor/capture.js, в сборке кладём его и LICENSE автора в dist/vendor/.
+function vendorCapture(): Plugin {
+  const src = path.resolve(__dirname, '..', 'vendor', 'paper-aquarium');
+  return {
+    name: 'vendor-capture',
+    configureServer(server) {
+      server.middlewares.use('/vendor/capture.js', (_req, res) => {
+        res.setHeader('content-type', 'application/javascript; charset=utf-8');
+        res.end(fs.readFileSync(path.join(src, 'capture.js')));
+      });
+    },
+    writeBundle(options) {
+      const out = path.join(options.dir ?? path.resolve(__dirname, 'dist'), 'vendor');
+      fs.mkdirSync(out, { recursive: true });
+      for (const f of ['capture.js', 'LICENSE']) fs.copyFileSync(path.join(src, f), path.join(out, f));
+    }
+  };
+}
+
 // seasons/*.json лежит на уровень выше scene/ — разрешаем Vite отдавать его в dev-режиме
 export default defineConfig({
   base: './',
-  plugins: [seasonWriter()],
+  plugins: [seasonWriter(), vendorCapture()],
   server: { fs: { allow: [path.resolve(__dirname, '..')] }, port: 5173 },
   build: {
     target: 'es2022', sourcemap: false,

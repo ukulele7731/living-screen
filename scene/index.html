@@ -13,11 +13,25 @@
     background: rgba(20, 22, 26, .62); border-radius: 6px; white-space: pre; pointer-events: none;
   }
   #dev[hidden] { display: none; }
+  #capture { position: fixed; right: 16px; bottom: 16px; z-index: 20; display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+    font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #cap-btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 20px; border-radius: 999px; cursor: pointer;
+    background: rgba(255, 244, 222, .92); color: #4a2e10; font-weight: 600; box-shadow: 0 4px 18px rgba(0,0,0,.35); user-select: none; }
+  #cap-btn span { font-size: 22px; }
+  #cap-btn:active { transform: scale(.97); }
+  #cap-btn.busy { opacity: .6; pointer-events: none; }
+  #cap-msg { max-width: min(420px, 80vw); padding: 10px 14px; border-radius: 10px; background: rgba(20, 22, 26, .85); color: #f2ead8; }
+  #cap-msg[data-kind="ok"] { background: rgba(58, 96, 40, .9); }
+  #cap-msg[data-kind="err"] { background: rgba(120, 40, 30, .9); }
+  #cap-msg[hidden], #cap-preview[hidden] { display: none; }
+  #cap-preview { width: 140px; border-radius: 8px; box-shadow: 0 4px 18px rgba(0,0,0,.35); background: #fff; }
 </style>
 </head>
 <body>
 <canvas id="view"></canvas>
 <div id="dev"></div>
+<!-- распознавание раскраски — сторонний capture.js (MIT, Мистер Мотя), лежит в vendor/, не меняется -->
+<script src="./vendor/capture.js"></script>
 <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
