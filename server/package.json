@@ -1,0 +1,31 @@
+{
+  "name": "living-screen-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "«Живой экран» — сервер: комнаты, роли, листья, WebSocket, Telegram-бот (server-spec.md)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "migrate": "tsx src/migrate.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1133.0",
+    "fastify": "^5.12.5",
+    "grammy": "^1.46.0",
+    "ioredis": "^6.0.0",
+    "pg": "^8.23.0",
+    "sharp": "^0.35.4",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.3",
+    "@types/pg": "^8.23.1",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.23.13",
+    "typescript": "^5.9.0"
+  }
+}
