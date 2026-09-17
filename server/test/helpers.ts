@@ -37,7 +37,7 @@ export async function makeTestApp(): Promise<TestApp> {
 /** Клиент с cookie-банкой: как отдельный браузер (телевизор, телефон гостя, телефон владельца). */
 export class Client {
   cookies: Record<string, string> = {};
-  constructor(private app: FastifyInstance, public ip = '10.0.0.1') {}
+  constructor(readonly app: FastifyInstance, public ip = '10.0.0.1') {}
 
   async call(method: InjectOptions['method'], url: string, body?: unknown, headers: Record<string, string> = {}): Promise<LightMyRequestResponse> {
     const res = await this.app.inject({

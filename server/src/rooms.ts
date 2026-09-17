@@ -169,11 +169,12 @@ export class Rooms {
   // ── срок жизни ──
 
   /** Удалить просроченные комнаты (без листьев — сутки, с листьями — год с последнего). */
-  sweepExpired(): string[] {
+  sweepExpired(onRoom?: (code: string) => void): string[] {
     const rows = this.db.prepare('SELECT id, code FROM rooms WHERE expires_at < ?').all(iso(this.now())) as { id: number; code: string }[];
     for (const r of rows) {
       this.event('room.expired', null);
       this.db.prepare('DELETE FROM rooms WHERE id = ?').run(r.id);   // экраны, листья, коды — каскадом
+      onRoom?.(r.code);                                              // файлы папки rooms/<код> — вызывающий
     }
     return rows.map((r) => r.code);
   }

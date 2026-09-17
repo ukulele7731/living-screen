@@ -37,9 +37,10 @@ export async function roomRoutes(app: FastifyInstance, s: Services): Promise<voi
   // Комната при загрузке экрана (и гостя): сезон, настройки, листья (список — шаг 3.3)
   app.get<{ Params: { code: string } }>('/api/rooms/:code', async (req, reply) => {
     const a = actorFor(req, reply, s);
+    const leaves = s.leaves.live(a.room).map((l) => s.leaves.view(l));
     return {
       code: a.room.code, season: a.room.season, settings: JSON.parse(a.room.settings || '{}'),
-      leaves: [] as unknown[], leaf_count: s.rooms.liveLeafCount(a.room),
+      leaves, leaf_count: leaves.length,
       role: a.owner ? 'owner' : a.screen ? 'screen' : 'guest'
     };
   });
@@ -61,6 +62,8 @@ export async function roomRoutes(app: FastifyInstance, s: Services): Promise<voi
     }
     if (!Object.keys(patch).length) throw badRequest('Нечего менять: передайте season или settings');
     const room = s.rooms.update(a.room, patch);
+    if (patch.season !== undefined) s.hub.broadcast(room.id, { type: 'room.season', season: room.season });
+    if (patch.settings !== undefined) s.hub.broadcast(room.id, { type: 'room.settings', settings: JSON.parse(room.settings) });
     return { code: room.code, season: room.season, settings: JSON.parse(room.settings) };
   });
 
@@ -69,6 +72,8 @@ export async function roomRoutes(app: FastifyInstance, s: Services): Promise<voi
     const a = actorFor(req, reply, s);
     requireOwner(a);
     const removed = s.rooms.reset(a.room);
+    await s.leaves.removeAllFiles(a.room);
+    s.hub.broadcast(a.room.id, { type: 'room.reset' });
     return { ok: true, removed };
   });
 

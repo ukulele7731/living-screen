@@ -8,15 +8,20 @@ import { makeStorage, type Storage } from './storage.js';
 import { Rooms } from './rooms.js';
 import { RateLimiter } from './rate-limit.js';
 import { ApiError } from './errors.js';
+import { Leaves } from './leaves.js';
+import { Hub, wsRoutes } from './ws.js';
 import { healthRoutes } from './routes/health.js';
 import { roomRoutes } from './routes/rooms.js';
 import { screenRoutes } from './routes/screens.js';
+import { leafRoutes } from './routes/leaves.js';
 
 export interface Services {
   cfg: Config;
   db: Db;
   storage: Storage;
   rooms: Rooms;
+  leaves: Leaves;
+  hub: Hub;
   limiter: RateLimiter;
   /** текущее время — подменяется в тестах (сроки жизни, TTL кодов) */
   now: () => number;
@@ -25,9 +30,10 @@ export interface Services {
 
 export function makeServices(cfg: Config, now: () => number = Date.now): Services {
   const db = makeDb(cfg);
+  const storage = makeStorage(cfg);
   return {
-    cfg, db, storage: makeStorage(cfg), rooms: new Rooms(db, now), limiter: new RateLimiter(now), now,
-    version: process.env.npm_package_version ?? '0.1.0'
+    cfg, db, storage, rooms: new Rooms(db, now), leaves: new Leaves(db, storage, now), hub: new Hub(),
+    limiter: new RateLimiter(now), now, version: process.env.npm_package_version ?? '0.1.0'
   };
 }
 
@@ -38,10 +44,7 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
     bodyLimit: 4 * 1024 * 1024        // текстура листа до 3 МБ плюс поля формы
   });
   app.decorate('services', services);
-  await app.register(cookie);
-  await healthRoutes(app, services);
-  await roomRoutes(app, services);
-  await screenRoutes(app, services);
+  // обработчики ошибок — до плагинов: после await register() они бы легли не на корневой контекст
   app.setErrorHandler((err: FastifyError | ApiError, req, reply) => {
     if (err instanceof ApiError) {
       if (err.statusCode === 429 && err.extra?.retryAfterSec) reply.header('retry-after', String(err.extra.retryAfterSec));
@@ -53,6 +56,12 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
     reply.code(status).send({ error: status === 500 ? 'Внутренняя ошибка сервера' : err.message });
   });
   app.setNotFoundHandler((_req, reply) => { reply.code(404).send({ error: 'Не найдено' }); });
+  await app.register(cookie);
+  await healthRoutes(app, services);
+  await roomRoutes(app, services);
+  await screenRoutes(app, services);
+  await leafRoutes(app, services);
+  await wsRoutes(app, services);
   return app;
 }
 

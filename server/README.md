@@ -54,6 +54,25 @@ npm test             # node:test через tsx: комнаты, роли, вх�
 Лимиты в памяти процесса: 5 комнат в час и 20 в сутки с адреса, 10 попыток входа в час,
 60 кодов привязки в час. Просроченные комнаты убирает `sweeper` раз в 10 минут.
 
+## Листья (шаг 3.3)
+
+`POST /api/rooms/:code/leaves` (multipart: `texture` PNG от capture.js, `kind`, `name`) →
+sharp: маска по контуру (эрозия 2 px, мягкий край 1 px), `tex.webp` 512 px **без альфы**
+(сцена режет по контуру сама; альфа на краю даёт тёмную кайму при фильтрации), `thumb.webp`
+128 px с альфой, `normal.webp` (Собель 0.6), `thick.webp` (1 у жилки → 0.4 у края), `orig.png`
+на 7 дней. Файлы в `data/rooms/<код>/leaves/<id>/`, наружу — `/files/<ключ>` только для живых
+листьев, с вечным кэшем. WebSocket `/ws/rooms/:code` для экранов: `leaf.new`, `leaf.deleted`,
+`room.reset`, `room.season`, `room.settings`, пинг раз в 30 с.
+
+Контуры сезона — `seasons/<сезон>/manifest.json` и `sheets.pdf`: копии из `assets/coloring/`
+(сервер ничего не импортирует из других папок). После `node tools/make-sheets.js` и
+`node tools/make-pdf.js` обновить копии:
+
+```
+cp ../assets/coloring/manifest.json seasons/autumn/manifest.json
+cp ../assets/coloring/raskraski.pdf  seasons/autumn/sheets.pdf
+```
+
 ## Миграции
 
 `migrations/NNNN_название.sql` (диалект SQLite), применяются по порядку при старте, каждая
