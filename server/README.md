@@ -67,6 +67,7 @@ npm test             # node:test через tsx: комнаты, роли, вх�
 
 ## На VPS
 
-`SITE_ADDRESS=домен` в `.env` (Caddy сам получит HTTPS), порты Caddy `80:80` и `443:443`
-в compose. Деплой: `git pull && docker compose up -d --build`. Бэкап — архив `data/`
-(шаг 3.6). Подробно — шаг 3.7.
+В `.env`: `SITE_ADDRESS=домен` (кириллический — в punycode; Caddy сам получит HTTPS),
+`CADDY_HTTP_PORT=80`, `CADDY_HTTPS_PORT=443`, `NODE_ENV=production`, `PUBLIC_URL=https://домен`.
+Деплой: `git pull && docker compose up -d --build`. Бэкап — архив `data/` (шаг 3.6).
+Подробно — `DEPLOY.md`.

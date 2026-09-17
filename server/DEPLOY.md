@@ -106,4 +106,32 @@ docker --version && git --version
 
 ## Часть 2. Установка «Живого экрана» на сервер
 
-Появится на шаге 3.7.
+Один раз, в консоли сервера (по одной команде). Домен здесь — `живой-экран.рф`, в punycode
+`xn----8sbepkhizex5l.xn--p1ai`; для другого домена подставить свой.
+
+```
+git clone https://github.com/ukulele7731/living-screen.git /opt/living-screen
+```
+```
+cd /opt/living-screen/server && git checkout claude/stage-3-server && cp .env.example .env
+```
+```
+sed -i 's#^NODE_ENV=.*#NODE_ENV=production#; s#^PUBLIC_URL=.*#PUBLIC_URL=https://xn----8sbepkhizex5l.xn--p1ai#; s#^SITE_ADDRESS=.*#SITE_ADDRESS=xn----8sbepkhizex5l.xn--p1ai#; s#^CADDY_HTTP_PORT=.*#CADDY_HTTP_PORT=80#; s#^CADDY_HTTPS_PORT=.*#CADDY_HTTPS_PORT=443#' .env
+```
+```
+docker compose up -d --build
+```
+```
+docker compose ps && curl -s https://xn----8sbepkhizex5l.xn--p1ai/healthz
+```
+
+Ожидается: оба контейнера `running`, ответ `{"ok":true,...}`. В браузере: https://живой-экран.рф/healthz.
+
+Обновление после новых коммитов:
+
+```
+cd /opt/living-screen/server && git pull && docker compose up -d --build
+```
+
+Логи: `docker compose logs -f app` (выход — Ctrl+C). Остановить: `docker compose down`
+(папка `data/` с базой и рисунками остаётся).

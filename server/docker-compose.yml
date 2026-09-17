@@ -1,7 +1,7 @@
 # «Живой экран» — два контейнера: app (Node + SQLite + папка data/) и caddy (HTTPS, статика).
 #   cp .env.example .env && docker compose up -d --build
 #   curl http://localhost:8080/healthz
-# На VPS то же самое: SITE_ADDRESS=домен в .env и порты Caddy 80/443.
+# На VPS то же самое: в .env SITE_ADDRESS=домен (punycode для кириллицы), CADDY_HTTP_PORT=80, CADDY_HTTPS_PORT=443.
 name: living-screen
 
 services:
@@ -29,7 +29,9 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8080:80"          # локально; на VPS заменить на "80:80" и "443:443"
+      # локально 8080 и 8443, на VPS в .env: CADDY_HTTP_PORT=80, CADDY_HTTPS_PORT=443
+      - "${CADDY_HTTP_PORT:-8080}:80"
+      - "${CADDY_HTTPS_PORT:-8443}:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./www:/srv/www:ro
