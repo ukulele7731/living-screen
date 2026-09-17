@@ -79,11 +79,36 @@ export class LeafField {
 
   get aeroCfg(): AeroCfg { return this.aero; }
 
-  /** Рисунок ребёнка (кадр по bbox вида, как отдаёт capture.js) → номер варианта текстуры вида. */
+  /** Рисунок ребёнка (кадр по bbox вида, как отдаёт capture.js) → номер варианта текстуры вида.
+   *  Если атлас вырос, окна текстур всех листьев вида переписываются. */
   addLeafTexture(kind: string, img: CanvasImageSource): number {
     const set = this.kinds.get(kind);
     if (!set || !set.atlas.addImage) throw new Error(`вид «${kind}» не поддерживает свои текстуры`);
-    return set.atlas.addImage(img);
+    const layout = set.atlas.layout;
+    const variant = set.atlas.addImage(img);
+    if (set.atlas.layout !== layout) for (const b of this.bodies) if (b.kind === kind) this.writeFull(b);
+    return variant;
+  }
+
+  /** Убрать лист (например, удалён на сервере); его ячейку атласа можно занять снова. */
+  removeLeaf(body: LeafBody): void {
+    const set = this.kinds.get(body.kind);
+    if (body.leafId && set?.atlas.freeImage && body.variant >= set.atlas.variants) set.atlas.freeImage(body.variant);
+    this.remove(body);
+  }
+
+  /** Лист, который уже лежит в ковре (при загрузке комнаты): на дорожке перед камерой, без полёта. */
+  spawnSettled(opts: SpawnOptions): LeafBody | null {
+    const pos = new THREE.Vector3((this.r() - 0.5) * 6, 0.02, -(2 + this.r() * 9));
+    const body = this.spawn({ ...opts, role: 'hero', pos, vel: new THREE.Vector3(0, 0, 0) });
+    if (!body) return null;
+    body.quat.setFromEuler(new THREE.Euler(-Math.PI / 2 + (this.r() - 0.5) * 0.4, 0, this.r() * 6.28, 'ZYX'));
+    body.angVel.set(0, 0, 0);
+    body.state = 'ground';
+    body.landedOnce = true;
+    this.relod(body);
+    this.writeFull(body);
+    return body;
   }
 
   /** Фоновый лист рождается в кронах деревьев вдоль всей аллеи: по обе стороны дорожки,
@@ -247,14 +272,14 @@ export class LeafField {
         b.state = 'fading';
       }
       if (b.state === 'fly') {
-        if (b.role === 'hero') this.steerHero(b); else b.steer.set(0, 0, 0);
+        if (b.role === 'hero' && !b.landedOnce) this.steerHero(b); else b.steer.set(0, 0, 0);
         for (let s = 0; s < sub; s++) {
           const gy = groundHeight(b.pos.x, b.pos.z);
           const lowest = b.step(h, this.wind, cfg, gy);
           const slow = b.vel.lengthSq() < 0.04 && b.angVel.lengthSq() < 0.3;
           if (lowest < gy + 0.03 && slow) b.restTimer += h; else b.restTimer = 0;
         }
-        if (b.restTimer > cfg.restTime) { b.state = 'ground'; b.restTimer = 0; b.bend.z = 0; b.flutter = 0; }
+        if (b.restTimer > cfg.restTime) { b.state = 'ground'; b.restTimer = 0; b.bend.z = 0; b.flutter = 0; b.landedOnce = true; }
         // улетел далеко — убираем (главные держатся у камеры, их предел шире)
         const zLim = b.role === 'hero' ? 12 : 4;
         if (b.pos.y < -2 || Math.abs(b.pos.x) > 60 || b.pos.z > zLim || b.pos.z < -80) { this.remove(b); continue; }

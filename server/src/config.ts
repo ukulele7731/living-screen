@@ -11,6 +11,7 @@ export interface Config {
   dataDir: string;            // база и картинки: data/db.sqlite, data/rooms/...
   minFreeMb: number;          // ниже этого /healthz даёт 503 — место кончается
   defaultSeason: string;      // сезон новых комнат
+  wwwDir: string;             // пусто — статику отдаёт Caddy; путь — раздаём сами (разработка без Docker)
   telegramBotToken: string;   // пусто — бот не запускается (шаг 3.4)
 }
 
@@ -33,6 +34,7 @@ export function loadConfig(): Config {
     dataDir: path.resolve(opt('DATA_DIR', 'data')),
     minFreeMb: Number(opt('MIN_FREE_MB', '500')),
     defaultSeason: opt('DEFAULT_SEASON', 'autumn'),
+    wwwDir: process.env.WWW_DIR ? path.resolve(process.env.WWW_DIR) : '',
     telegramBotToken: opt('TELEGRAM_BOT_TOKEN', '')
   };
 }

@@ -128,10 +128,23 @@ docker compose ps && curl -s https://xn----8sbepkhizex5l.xn--p1ai/healthz
 
 Ожидается: оба контейнера `running`, ответ `{"ok":true,...}`. В браузере: https://живой-экран.рф/healthz.
 
+### Страницы сайта (сцена, загрузчик, главная)
+
+Страницы собираются в `server/www` и раздаются Caddy. Сборка сцены идёт в контейнере
+`node:22`, ставить Node на VPS не нужно. Один раз и после каждого обновления кода сцены:
+
+```
+cd /opt/living-screen && sh server/ops/build-www.sh
+```
+
+Готово, когда напечатает `✓ готово` и список `index.html r rules.html tv vendor`. Перезапуск
+не нужен: Caddy читает папку напрямую. Проверить: https://живой-экран.рф/tv/ — экран с кодом
+привязки и кнопкой «Создать новую комнату».
+
 Обновление после новых коммитов (и после любой моей правки — это же и есть «выкатить исправление»):
 
 ```
-cd /opt/living-screen/server && git pull && docker compose up -d --build
+cd /opt/living-screen/server && git pull && docker compose up -d --build && sh ops/build-www.sh
 ```
 
 Логи: `docker compose logs -f app` (выход — Ctrl+C). Остановить: `docker compose down`

@@ -14,6 +14,7 @@ import { healthRoutes } from './routes/health.js';
 import { roomRoutes } from './routes/rooms.js';
 import { screenRoutes } from './routes/screens.js';
 import { leafRoutes } from './routes/leaves.js';
+import { staticRoutes } from './routes/static.js';
 
 export interface Services {
   cfg: Config;
@@ -62,6 +63,7 @@ export async function buildApp(services: Services): Promise<FastifyInstance> {
   await screenRoutes(app, services);
   await leafRoutes(app, services);
   await wsRoutes(app, services);
+  await staticRoutes(app, services);
   return app;
 }
 

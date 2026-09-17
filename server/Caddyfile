@@ -1,11 +1,33 @@
-# Caddy: HTTPS сам (на домене), API и WebSocket — в Node, статика сцены и загрузчика — из /srv/www.
+# Caddy: HTTPS сам (на домене). API, WebSocket и файлы листьев — в Node; страницы — статика из /srv/www:
+#   /            главная (www/index.html)
+#   /tv          сцена для телевизора (www/tv — сборка scene/)
+#   /r/<код>     загрузчик для телефона (www/r — папка uploader/)
+#   /vendor/*    capture.js (MIT, Мистер Мотя) для загрузчика
 {$SITE_ADDRESS} {
 	encode gzip
+	root * /srv/www
 
-	@app path /api/* /ws/* /healthz
+	@app path /api/* /ws/* /files/* /healthz
 	reverse_proxy @app app:3000
 
-	# Статика сцены и загрузчика (собранный dist сцены кладётся в ./www рядом с compose; шаг 3.7)
-	root * /srv/www
-	file_server
+	redir /tv /tv/ permanent
+	handle_path /tv/* {
+		root * /srv/www/tv
+		file_server
+	}
+
+	handle /r/* {
+		@rasset path /r/app.js /r/app.css
+		handle @rasset {
+			root * /srv/www
+			file_server
+		}
+		rewrite * /r/index.html
+		file_server
+	}
+
+	handle {
+		try_files {path} {path}.html /index.html
+		file_server
+	}
 }

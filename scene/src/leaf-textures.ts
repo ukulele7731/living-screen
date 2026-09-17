@@ -17,8 +17,14 @@ export interface LeafAtlas {
   /** iUvRect для варианта: смещение и масштаб */
   rect(variant: number): [number, number, number, number];
   /** Положить рисунок ребёнка (кадр по bbox вида, как отдаёт capture.js) в свободную ячейку;
-   *  возвращает номер варианта. Ячейки кончились — занимает самую старую из добавленных. */
+   *  возвращает номер варианта. Атлас растёт сеткой (столбцы × строки) до 8192 px, потом
+   *  ячейки идут по кругу. После роста меняется layout — растёт `layout`, и все iUvRect
+   *  экземпляров этого вида надо записать заново (LeafField это делает сам). */
   addImage?(img: CanvasImageSource): number;
+  /** Освободить ячейку (лист удалён), чтобы её занял следующий рисунок. */
+  freeImage?(variant: number): void;
+  /** номер раскладки: меняется при росте атласа */
+  layout: number;
 }
 
 type P = [number, number];
@@ -126,15 +132,18 @@ export function atlasFromImage(img: HTMLImageElement, shape: LeafShape, leafLong
   const mmPerPx = leafLongMm / Math.max(w, h);
   const normalMap = normalMapFromCanvas(canvas, 0.35, { mm: veinHeightMm(shape, w, h, leafLongMm), mmPerPx });
   normalMap.wrapS = normalMap.wrapT = THREE.ClampToEdgeWrapping;
-  return { map, normalMap, variants: 1, rect: () => [0, 0, 1, 1] };
+  return { map, normalMap, variants: 1, layout: 0, rect: () => [0, 0, 1, 1] };
 }
 
 /** Нарисованный лист: градиент от черешка к кончику, пятна, жилки, тёмный край. */
-export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: number, leafLongMm = 300, cellW = 512, extraSlots = 6): LeafAtlas {
+export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: number, leafLongMm = 300, cellW = 512, extraSlots = 4): LeafAtlas {
   const cellH = Math.round(cellW / shape.aspect);
   const variants = palettes.length;
-  const slots = variants + extraSlots;                        // запасные ячейки — под рисунки детей (демо без сервера)
-  const [canvas, ctx] = makeCanvas(cellW, cellH * slots);
+  const MAX_DIM = 8192;                                       // предел текстуры на телевизорах
+  const rowsMax = Math.max(1, Math.floor(MAX_DIM / cellH)), colsMax = Math.max(1, Math.floor(MAX_DIM / cellW));
+  let cols = 1, rows = variants + extraSlots;                 // запасные ячейки — под рисунки детей; атлас растёт по мере надобности
+  let slots = cols * rows;
+  const [canvas, ctx] = makeCanvas(cellW, cellH * rows);
   const noise = makeNoise2D(seed, 64);
   const { bbox, contour, vein } = shape;
   const bw = bbox.x1 - bbox.x0, bh = bbox.y1 - bbox.y0;
@@ -185,29 +194,67 @@ export function paintLeafAtlas(shape: LeafShape, palettes: LeafPalette[], seed: 
   const map = canvasTexture(canvas);
   map.wrapS = map.wrapT = THREE.ClampToEdgeWrapping;
   map.anisotropy = 8;
-  // рельеф жилок один на все варианты: карта высот ячейки повторяется по строкам
+  // рельеф жилок один на все варианты: карта высот ячейки, нормали считаются по ячейке
   const cellMm = veinHeightMm(shape, cellW, cellH, leafLongMm);
-  const allMm = new Float32Array(cellW * cellH * slots);
-  for (let v = 0; v < slots; v++) allMm.set(cellMm, v * cellW * cellH);
-  const veins = { mm: allMm, mmPerPx: leafLongMm / cellW };
-  const [normalCanvas] = makeCanvas(cellW, cellH * slots);
-  renderNormalMap(canvas, 0.35, veins, normalCanvas);
+  const veins = { mm: cellMm, mmPerPx: leafLongMm / cellW };
+  const [normalCanvas, nctx] = makeCanvas(cellW, cellH * rows);
+  const [cellSrc, cellCtx] = makeCanvas(cellW, cellH);
+  const [cellNormal] = makeCanvas(cellW, cellH);
+  const cellPos = (v: number): [number, number] => [(v % cols) * cellW, Math.floor(v / cols) * cellH];
+  const renderCell = (v: number) => {
+    const [x, y] = cellPos(v);
+    cellCtx.clearRect(0, 0, cellW, cellH);
+    cellCtx.drawImage(canvas, x, y, cellW, cellH, 0, 0, cellW, cellH);
+    renderNormalMap(cellSrc, 0.35, veins, cellNormal);
+    nctx.drawImage(cellNormal, x, y);
+  };
+  for (let v = 0; v < variants; v++) renderCell(v);
   const normalMap = canvasTexture(normalCanvas, false);
   normalMap.wrapS = normalMap.wrapT = THREE.ClampToEdgeWrapping;
-  let nextSlot = variants;
-  return {
-    map, normalMap, variants,
-    rect(v) { return [0, 1 - (v + 1) / slots, 1, 1 / slots]; },
+
+  const used = new Set<number>();                             // занятые ячейки под рисунки
+  const order: number[] = [];                                 // порядок добавления — для вытеснения самых старых
+  const grow = (): boolean => {
+    // сначала растём строками до предела высоты, потом столбцами
+    let nCols = cols, nRows = rows;
+    if (rows * 2 <= rowsMax) nRows = rows * 2; else if (cols * 2 <= colsMax) nCols = cols * 2; else return false;
+    const [big, bctx] = makeCanvas(cellW * nCols, cellH * nRows);
+    const [bigN, bnctx] = makeCanvas(cellW * nCols, cellH * nRows);
+    for (let v = 0; v < slots; v++) {
+      const [sx, sy] = cellPos(v);
+      const dx = (v % nCols) * cellW, dy = Math.floor(v / nCols) * cellH;
+      bctx.drawImage(canvas, sx, sy, cellW, cellH, dx, dy, cellW, cellH);
+      bnctx.drawImage(normalCanvas, sx, sy, cellW, cellH, dx, dy, cellW, cellH);
+    }
+    cols = nCols; rows = nRows; slots = cols * rows;
+    canvas.width = big.width; canvas.height = big.height; ctx.drawImage(big, 0, 0);
+    normalCanvas.width = bigN.width; normalCanvas.height = bigN.height; nctx.drawImage(bigN, 0, 0);
+    map.needsUpdate = true; normalMap.needsUpdate = true;
+    atlas.layout++;
+    return true;
+  };
+  const atlas: LeafAtlas = {
+    map, normalMap, variants, layout: 0,
+    rect(v) { return [(v % cols) / cols, 1 - (Math.floor(v / cols) + 1) / rows, 1 / cols, 1 / rows]; },
     addImage(img) {
-      if (extraSlots === 0) return 0;
-      const slot = nextSlot;
-      nextSlot = variants + ((nextSlot - variants + 1) % extraSlots);   // по кругу среди запасных
-      ctx.clearRect(0, slot * cellH, cellW, cellH);
-      ctx.drawImage(img, 0, slot * cellH, cellW, cellH);
+      let slot = -1;
+      for (let v = variants; v < slots; v++) if (!used.has(v)) { slot = v; break; }
+      if (slot < 0 && grow()) { for (let v = variants; v < slots; v++) if (!used.has(v)) { slot = v; break; } }
+      if (slot < 0) { slot = order.shift()!; }                // всё занято и расти некуда — вытесняем самый старый
+      used.add(slot); order.push(slot);
+      const [x, y] = cellPos(slot);
+      ctx.clearRect(x, y, cellW, cellH);
+      ctx.drawImage(img, x, y, cellW, cellH);
       map.needsUpdate = true;
-      renderNormalMap(canvas, 0.35, veins, normalCanvas);
+      renderCell(slot);
       normalMap.needsUpdate = true;
       return slot;
+    },
+    freeImage(v) {
+      used.delete(v);
+      const i = order.indexOf(v);
+      if (i >= 0) order.splice(i, 1);
     }
   };
+  return atlas;
 }

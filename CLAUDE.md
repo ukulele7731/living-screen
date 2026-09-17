@@ -29,7 +29,8 @@ living-screen/
   assets/coloring/            результат генератора: <вид>.svg, manifest.json, raskraski.pdf
   server/                     Fastify, SQLite, data/, WS, бот — изолированная серверная часть (server-spec.md)
   scene/                      Vite + three.js: sky, trees, leaf, wind, intro, ground, ui
-  uploader/                   мобильная страница /r/:code
+  uploader/                   мобильная страница /r/:code (index.html + app.js + app.css, без сборки)
+  site/                       главная и «Правила и данные» (статика)
   seasons/autumn.json, winter.json   параметры сезона: небо, физика, набор видов, тексты
 ```
 
@@ -195,6 +196,15 @@ npm run typecheck
   плагином `vendorCapture` в vite.config.ts, в сборке копируется в `dist/vendor/` с LICENSE) →
   рисунок в запасную ячейку атласа вида (`LeafAtlas.addImage`, 6 запасных ячеек на вид, по кругу)
   → главный лист. Это путь загрузчика этапа 3, только без сервера: GitHub Pages остаётся демо.
+- **Режим телевизора** (`tv.ts`): если за страницей есть сервер (`/api/tv/pairing` отвечает JSON),
+  сцена показывает код привязки или комнату: листья комнаты ложатся в ковёр (`spawnSettled`),
+  по WebSocket `leaf.new` влетает главным, `leaf.deleted`/`room.reset` убирают (`removeLeaf`),
+  `room.season` перезагружает страницу; в углу QR на `/r/<код>`. Атлас вида растёт сеткой до
+  8192 px (`LeafAtlas.addImage`/`freeImage`, `layout` меняется при росте — окна текстур
+  переписываются), нормали считаются по ячейке. Главный лист тянется к камере только в первом
+  полёте (`landedOnce`). Страницы для Caddy собирает `server/ops/build-www.sh` в `server/www`
+  (tv — сборка сцены, r — uploader/, vendor — capture.js, index/rules — site/); для разработки
+  без Caddy сервер раздаёт их сам при `WWW_DIR=../server/www`.
 - **Этап 2 принят** (60 fps на ноутбуке, 30 на ТВ). Часть 4 (общий атлас всех видов, BatchedMesh)
   **отложена** до появления реальных детских листьев — тогда будет видно, нужна ли она.
 - **Бюджет треугольников**: 60 летящих + 60 лежащих листьев ≈ 15–25 тыс. в основном проходе
