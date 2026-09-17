@@ -1,5 +1,7 @@
 node_modules/
 dist/
 data/
+www/*
+!www/.gitkeep
 .env
 *.log
