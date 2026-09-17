@@ -4,8 +4,10 @@ import { loadConfig } from './config.js';
 import { makeServices, buildApp, closeServices } from './app.js';
 import { migrate } from './migrate.js';
 import { startSweeper } from './sweeper.js';
+import { dropPrivileges } from './privileges.js';
 
 const cfg = loadConfig();
+dropPrivileges(cfg.dataDir, (m) => console.log('[start]', m));
 const services = makeServices(cfg);
 const applied = migrate(services.db);
 const app = await buildApp(services);
