@@ -113,8 +113,9 @@ docker --version && git --version
 git clone https://github.com/ukulele7731/living-screen.git /opt/living-screen
 ```
 ```
-cd /opt/living-screen/server && git checkout claude/stage-3-server && cp .env.example .env
+cd /opt/living-screen && git checkout claude/stage-3-server && cd server && cp .env.example .env
 ```
+(папка `server/` появляется только после переключения ветки; дальше все команды — из неё)
 ```
 sed -i 's#^NODE_ENV=.*#NODE_ENV=production#; s#^PUBLIC_URL=.*#PUBLIC_URL=https://xn----8sbepkhizex5l.xn--p1ai#; s#^SITE_ADDRESS=.*#SITE_ADDRESS=xn----8sbepkhizex5l.xn--p1ai#; s#^CADDY_HTTP_PORT=.*#CADDY_HTTP_PORT=80#; s#^CADDY_HTTPS_PORT=.*#CADDY_HTTPS_PORT=443#' .env
 ```
