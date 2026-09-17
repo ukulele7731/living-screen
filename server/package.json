@@ -5,7 +5,7 @@
   "description": "«Живой экран» — сервер: комнаты, роли, листья, WebSocket, Telegram-бот (server-spec.md). Один процесс: Node + SQLite + папка data/",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",

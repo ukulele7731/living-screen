@@ -128,7 +128,7 @@ docker compose ps && curl -s https://xn----8sbepkhizex5l.xn--p1ai/healthz
 
 Ожидается: оба контейнера `running`, ответ `{"ok":true,...}`. В браузере: https://живой-экран.рф/healthz.
 
-Обновление после новых коммитов:
+Обновление после новых коммитов (и после любой моей правки — это же и есть «выкатить исправление»):
 
 ```
 cd /opt/living-screen/server && git pull && docker compose up -d --build

@@ -17,7 +17,7 @@ curl http://localhost:8080/healthz
 Ответ `{"ok":true,"checks":{"db":{"ok":true,...},"storage":{"ok":true,"freeMb":...}}}` — всё
 поднялось. Если нет — `ok:false` и в `checks` написано, что именно (503).
 
-Два контейнера: `app` (Node 20: API, позже WS и бот; база и картинки в `./data` рядом с
+Два контейнера: `app` (Node 22: API, позже WS и бот; база и картинки в `./data` рядом с
 compose) и `caddy` (снаружи порт 8080 → API в `app`, статика сцены из `./www`).
 
 Логи: `docker compose logs -f app`. Остановить: `docker compose down` (папка `data/`
@@ -25,7 +25,7 @@ compose) и `caddy` (снаружи порт 8080 → API в `app`, статик
 
 ## Без Docker (разработка)
 
-Нужен только Node 20+. Ничего ставить не надо: база создастся сама в `data/`.
+Нужен только Node 22+. Ничего ставить не надо: база создастся сама в `data/`.
 
 ```
 cd server

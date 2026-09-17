@@ -262,7 +262,7 @@ Docker Compose на VPS, **два контейнера**: `app` (Node: API + WS 
 ```
 Этап 3 по документу server-spec.md. Шаг 3.1: создай server/ как полностью
 самостоятельный пакет (свой package.json, ничего не импортирует из scene/ и
-uploader/). Node 20, Fastify, better-sqlite3, sharp, ws, grammy — grammy пока
+uploader/). Node 22, Fastify, better-sqlite3, sharp, ws, grammy — grammy пока
 только в зависимостях. Docker Compose: app и caddy, папка data/ bind-mount.
 Миграции — простые SQL-файлы в server/migrations, применяются при старте.
 Схема из раздела 4. /healthz проверяет базу, запись в data/ и свободное
