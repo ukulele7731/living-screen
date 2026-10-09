@@ -150,8 +150,9 @@ h1 .line:nth-child(1) .ch{animation-delay:calc(var(--i)*.035s)}
 .card:hover .pbtn{background:var(--accent);color:var(--ink);border-color:var(--accent);transform:scale(1.1)}
 
 /* featured case */
-.feature{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(20px,4vw,56px);align-items:center;margin-bottom:40px;padding:clamp(16px,3vw,32px);border:1px solid var(--line);border-radius:14px;background:radial-gradient(120% 120% at 100% 0%,rgba(255,159,74,.12),transparent 55%),var(--panel)}
-.feature .card .frame{max-width:340px;margin-inline:auto}
+.feature{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,.65fr);gap:clamp(20px,4vw,56px);align-items:center;margin-bottom:40px;padding:clamp(16px,3vw,32px);border:1px solid var(--line);border-radius:14px;background:radial-gradient(120% 120% at 100% 0%,rgba(255,159,74,.12),transparent 55%),var(--panel)}
+.fgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.fgrid .cap p{display:none}
 .feature .kicker{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 14px}
 .feature .ftxt h3{font-family:var(--f-display);font-weight:800;font-size:clamp(24px,3.2vw,40px);line-height:1.05;margin:0 0 16px;letter-spacing:-.02em;text-wrap:balance}
 .feature .ftxt p{color:var(--muted);margin:0 0 18px;max-width:32em}
@@ -196,6 +197,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
   .pair .card .frame{max-width:340px}
 }
 @media (max-width:480px){
+  .fgrid{gap:8px}.fgrid .cap h3{font-size:12px}.fgrid .tag{display:none}.fgrid .pbtn{display:none}
   .steps{grid-template-columns:1fr}
   .cap h3{font-size:13.5px}.cap p{display:none}
   .pbtn{width:34px;height:34px}
@@ -275,18 +277,18 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
   </section>
 
   <section class="chapter" id="brands">
-    <div class="ch-head"><span class="ch-num">01</span><div><h2>Реклама брендов</h2><p>Продуктовые и fashion-ролики: товар крупно, детали, атмосфера бренда.</p></div><span class="ch-tc" data-tc="bike,bag,shirt,stool"></span></div>
-    <div class="grid" data-clips="bike,bag,shirt,stool"></div>
+    <div class="ch-head"><span class="ch-num">01</span><div><h2>Реклама брендов</h2><p>Продуктовые и fashion-ролики, мультреклама: товар крупно, детали, атмосфера бренда.</p></div><span class="ch-tc" data-tc="bike,bag,shirt,stool,mattress,razor"></span></div>
+    <div class="grid three" data-clips="bike,bag,shirt,stool,mattress,razor"></div>
   </section>
 
   <section class="chapter" id="cartoons">
-    <div class="ch-head"><span class="ch-num">02</span><div><h2>AI-мультфильмы</h2><p>Коммерческие сериалы с постоянными героями и сюжетные мультики.</p></div><span class="ch-tc" data-tc="med,train,store,plane,xmas,key,hair"></span></div>
+    <div class="ch-head"><span class="ch-num">02</span><div><h2>AI-мультфильмы</h2><p>Коммерческие сериалы с постоянными героями и сюжетные мультики.</p></div><span class="ch-tc" data-tc="med1,med,med3,train,store,plane,xmas,key,hair"></span></div>
     <div class="feature">
-      <div data-clips="med"></div>
+      <div class="fgrid" data-clips="med1,med,med3"></div>
       <div class="ftxt">
         <p class="kicker">Кейс · коммерческий мультсериал</p>
         <h3>Мультсериал для медцентра «МЫ»</h3>
-        <p>Серия роликов, где герои проживают ситуации, с которыми семьи приходят в центр. Мультфильм объясняет услугу через историю, а не через рекламу в лоб.</p>
+        <p>Три серии о детях, которым тяжело даются шум и толпа, и о том, как центр помогает семье. Мультфильм объясняет услугу через историю, а не через рекламу в лоб.</p>
         <div class="chips"><span>3 серии</span><span>постоянные персонажи</span><span>брендинг заказчика</span><span>9:16</span></div>
       </div>
     </div>
@@ -328,7 +330,11 @@ var C={
   bag:{t:"Пакет из бутика",s:"Кинематографичный fashion-сюжет",tag:"Fashion",d:12},
   shirt:{t:"Лукбук рубашки",s:"Модель, локация и принт без съёмки",tag:"Fashion",d:14},
   stool:{t:"Детский стульчик",s:"Студийная предметка для карточки",tag:"Предметка",d:14},
-  med:{t:"Медцентр «МЫ» · серия 2",s:"Коммерческий мультсериал",tag:"Кейс",d:101},
+  mattress:{t:"Надувной матрас",s:"Один товар: дом, пляж и поход",tag:"Мультреклама",d:43},
+  razor:{t:"Женская бритва",s:"Сказка, где продукт в главной роли",tag:"Мультреклама",d:32},
+  med1:{t:"Серия 1",s:"Медцентр «МЫ»",tag:"Кейс",d:40},
+  med:{t:"Серия 2",s:"Медцентр «МЫ»",tag:"Кейс",d:101},
+  med3:{t:"Серия 3",s:"Медцентр «МЫ»",tag:"Кейс",d:87},
   train:{t:"В поезде",s:"Серия 1",tag:"Сериал",d:29},
   store:{t:"Истерика в магазине",s:"Серия 2",tag:"Сериал",d:33},
   plane:{t:"В самолёте",s:"Серия 3",tag:"Сериал",d:24},
