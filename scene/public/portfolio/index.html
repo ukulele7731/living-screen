@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Елена Кузнецова — AI-видеокреатор: реклама брендов, AI-мультфильмы, цифровые аватары">
+<meta property="og:title" content="Елена Кузнецова — AI Video">
+<meta property="og:image" content="v/elena.jpg">
+<title>Елена Кузнецова — AI Video</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@300;500;800;900&family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a showreel you scroll — kinetic title over live phone-frame loops, chapter "timecodes" for each category, hover-to-preview reels, full-screen player */
+:root{
+  --bg:#0f0d11;
+  --panel:#19161c;
+  --line:#2b2630;
+  --fg:#f3eee8;
+  --muted:#9f97a0;
+  --accent:#ff9f4a;     /* tungsten / film-light orange */
+  --accent-2:#ff5f6d;   /* warm red of a REC lamp */
+  --ink:#170f07;
+  --f-display:"Unbounded","Arial Black",system-ui,sans-serif;
+  --f-body:"Golos Text",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;overflow-x:clip}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:clamp(16px,4vw,48px);padding-block:0}
+
+/* film grain + vignette */
+.grain{position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.09;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation:grain .9s steps(6) infinite}
+@keyframes grain{0%{background-position:0 0}20%{background-position:-37px 21px}40%{background-position:24px -53px}60%{background-position:-61px -12px}80%{background-position:43px 38px}100%{background-position:0 0}}
+.glow{position:fixed;width:560px;max-width:none;height:560px;border-radius:50%;pointer-events:none;z-index:0;left:0;top:0;
+  background:radial-gradient(circle,rgba(255,159,74,.13),transparent 65%);transform:translate(-50%,-50%);transition:opacity .4s}
+
+/* bar */
+.bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:40;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(15,13,17,.62);border-bottom:1px solid rgba(255,255,255,.05)}
+.bar .wrap{display:flex;justify-content:space-between;align-items:center;gap:16px;padding-block:14px;font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.rec{display:inline-flex;align-items:center;gap:10px;color:var(--fg)}
+.rec i{width:9px;height:9px;border-radius:50%;background:var(--accent-2);box-shadow:0 0 14px var(--accent-2);animation:blink 1.2s steps(2) infinite}
+@keyframes blink{50%{opacity:.25}}
+.tcode{font-variant-numeric:tabular-nums;color:var(--muted)}
+.bar nav{display:flex;gap:22px}
+.bar nav a{text-decoration:none;position:relative}
+.bar nav a::after{content:"";position:absolute;left:0;right:100%;bottom:-4px;height:1px;background:var(--accent);transition:right .3s}
+.bar nav a:hover{color:var(--fg)}
+.bar nav a:hover::after{right:0}
+
+/* hero */
+.hero{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(24px,4vw,56px);align-items:center;padding-block:clamp(40px,8vw,96px) clamp(48px,7vw,88px)}
+.hero>div:first-child{container-type:inline-size;min-width:0}
+.eyebrow{font-family:var(--f-mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 22px;display:flex;align-items:center;gap:12px}
+.eyebrow::before{content:"";width:36px;height:1px;background:var(--accent)}
+h1{font-family:var(--f-display);font-weight:900;font-size:clamp(28px,15.5cqi,84px);line-height:.95;letter-spacing:-.035em;margin:0 0 28px;text-transform:uppercase}
+h1 .line{display:block;overflow:hidden;padding-bottom:.06em}
+h1 .ch{display:inline-block;animation:rise .9s cubic-bezier(.2,.8,.2,1) both}
+h1 .outline{color:transparent;-webkit-text-stroke:1.5px var(--fg)}
+h1 .line:nth-child(2) .ch{animation-delay:calc(.25s + var(--i)*.035s)}
+h1 .line:nth-child(1) .ch{animation-delay:calc(var(--i)*.035s)}
+@keyframes rise{from{transform:translateY(105%) rotate(6deg)}to{transform:none}}
+.role{font-family:var(--f-display);font-weight:300;font-size:clamp(17px,2vw,24px);line-height:1.3;margin:0 0 20px;max-width:24em;text-wrap:balance}
+.role b{font-weight:500;background:linear-gradient(90deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lede{max-width:33em;color:var(--muted);margin:0 0 32px;font-size:17px}
+.cta{display:flex;gap:14px;flex-wrap:wrap}
+.btn{position:relative;display:inline-flex;align-items:center;gap:10px;padding:15px 24px;border-radius:999px;text-decoration:none;font-weight:600;font-size:15px;border:1px solid var(--line);overflow:hidden;transition:transform .25s,border-color .25s;isolation:isolate}
+.btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+.btn.primary::before{content:"";position:absolute;inset:0;background:var(--fg);transform:translateY(101%);transition:transform .35s cubic-bezier(.2,.8,.2,1);z-index:-1}
+.btn.primary:hover::before{transform:none}
+.btn:not(.primary):hover{border-color:var(--fg)}
+.btn svg{transition:transform .3s}
+.btn:hover svg{transform:translateX(4px)}
+
+/* phones stack */
+.stack{position:relative;height:clamp(380px,46vw,600px);perspective:1200px}
+.phone{position:absolute;width:44%;aspect-ratio:9/16;border-radius:18px;overflow:hidden;background:#000;border:1px solid rgba(255,255,255,.12);box-shadow:0 30px 80px rgba(0,0,0,.6);transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.phone video{width:100%;height:100%;object-fit:cover;display:block}
+.phone::after{content:attr(data-tag);position:absolute;left:10px;bottom:10px;font-family:var(--f-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;background:rgba(0,0,0,.55);padding:3px 7px;border-radius:3px}
+.phone.p1{left:2%;top:10%;transform:rotate(-8deg);animation:float 7s ease-in-out infinite}
+.phone.p2{left:30%;top:0;z-index:2;transform:rotate(2deg);animation:float 6s ease-in-out -2s infinite}
+.phone.p3{left:56%;top:14%;transform:rotate(9deg);animation:float 8s ease-in-out -4s infinite}
+@keyframes float{50%{translate:0 -14px}}
+.stack .badge{position:absolute;right:0;bottom:2%;z-index:3;width:116px;height:116px;border-radius:50%;background:var(--accent);color:var(--ink);display:flex;align-items:center;justify-content:center;font-family:var(--f-display);font-weight:800;font-size:13px;text-align:center;line-height:1.15}
+.badge svg{position:absolute;inset:0;animation:spin 14s linear infinite}
+.badge text{font-family:var(--f-mono);font-size:9.5px;letter-spacing:2.2px;fill:var(--ink);text-transform:uppercase}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* marquee */
+.mq-clip{overflow:hidden;padding-block:24px;margin-block:-24px 56px}
+.marquee{position:relative;z-index:2;background:var(--accent);color:var(--ink);transform:rotate(-1.6deg);margin-inline:-20px;overflow:hidden;border-block:1px solid var(--ink)}
+.marquee .track{display:flex;width:max-content;animation:scroll 26s linear infinite}
+.marquee span{font-family:var(--f-display);font-weight:800;font-size:clamp(22px,3.4vw,40px);text-transform:uppercase;padding-block:14px;padding-inline:22px;white-space:nowrap;display:flex;align-items:center;gap:44px}
+.marquee span em{font-style:normal;color:transparent;-webkit-text-stroke:1.2px var(--ink)}
+@keyframes scroll{to{transform:translateX(-50%)}}
+
+/* about */
+.about{position:relative;z-index:1;display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:clamp(28px,5vw,72px);align-items:center;padding-block:0 110px}
+.portrait{position:relative;margin:0}
+.portrait img{display:block;width:100%;aspect-ratio:4/5;object-fit:cover;object-position:50% 30%;border-radius:6px;filter:contrast(1.05)}
+.portrait::before{content:"";position:absolute;inset:auto -18px -18px auto;width:70%;height:70%;border:1px solid var(--accent);border-radius:6px;z-index:-1}
+.portrait figcaption{position:absolute;left:14px;top:14px;font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;background:rgba(15,13,17,.7);padding:5px 9px;border-radius:3px;display:flex;gap:8px;align-items:center}
+.portrait figcaption i{width:7px;height:7px;border-radius:50%;background:var(--accent-2);animation:blink 1.2s steps(2) infinite}
+.about h2{font-family:var(--f-display);font-weight:800;font-size:clamp(28px,4vw,48px);line-height:1.05;letter-spacing:-.02em;margin:0 0 20px;text-wrap:balance}
+.about p{color:var(--muted);max-width:34em;margin:0 0 30px}
+.steps{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.step{border:1px solid var(--line);border-radius:6px;padding:18px;background:var(--panel);transition:border-color .3s,transform .3s}
+.step:hover{border-color:var(--accent);transform:translateY(-3px)}
+.step i{font-style:normal;font-family:var(--f-mono);font-size:11px;color:var(--accent)}
+.step h3{font-family:var(--f-display);font-weight:500;font-size:16px;margin:6px 0 4px}
+.step p{margin:0;font-size:14px}
+
+/* chapters */
+.chapter{position:relative;z-index:1;padding-block:0 110px}
+.ch-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:clamp(14px,3vw,36px);align-items:end;margin-bottom:32px}
+.ch-num{font-family:var(--f-display);font-weight:900;font-size:clamp(56px,9vw,128px);line-height:.8;color:transparent;-webkit-text-stroke:1.2px var(--accent)}
+.ch-head h2{font-family:var(--f-display);font-weight:800;font-size:clamp(24px,3.6vw,44px);line-height:1.05;margin:0 0 6px;letter-spacing:-.02em;text-wrap:balance}
+.ch-head p{margin:0;color:var(--muted);max-width:36em}
+.ch-tc{font-family:var(--f-mono);font-size:12px;color:var(--muted);letter-spacing:.08em;text-align:right;white-space:nowrap}
+
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.grid.three{grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+
+.card{position:relative;margin:0;cursor:pointer;min-width:0}
+.card .frame{position:relative;aspect-ratio:9/16;border-radius:10px;overflow:hidden;background:#000;transform-style:preserve-3d;transition:transform .5s cubic-bezier(.2,.8,.2,1),box-shadow .5s;border:1px solid rgba(255,255,255,.07)}
+.card.wide .frame{aspect-ratio:16/9}
+.card img,.card video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.card video{opacity:0;transition:opacity .35s}
+.card.hot video{opacity:1}
+.card img{transition:transform .9s cubic-bezier(.2,.8,.2,1)}
+.card:hover img{transform:scale(1.06)}
+.card:hover .frame{box-shadow:0 26px 60px rgba(0,0,0,.55),0 0 0 1px var(--accent)}
+.card .frame::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.35),transparent 25%,transparent 60%,rgba(0,0,0,.7));pointer-events:none}
+.card .scan{position:absolute;inset:0;pointer-events:none;z-index:2;background:linear-gradient(180deg,transparent,rgba(255,159,74,.35),transparent);height:30%;transform:translateY(-120%)}
+.card.seen .scan{animation:scan 1.1s cubic-bezier(.3,.6,.2,1) forwards}
+@keyframes scan{to{transform:translateY(420%)}}
+.tag{position:absolute;z-index:3;left:12px;top:12px;font-family:var(--f-mono);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;display:flex;gap:6px;align-items:center}
+.tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.dur{position:absolute;z-index:3;right:12px;top:12px;font-family:var(--f-mono);font-size:11px;font-variant-numeric:tabular-nums;background:rgba(0,0,0,.55);padding:2px 7px;border-radius:3px}
+.cap{position:absolute;z-index:3;left:14px;right:14px;bottom:14px;display:flex;justify-content:space-between;align-items:end;gap:10px}
+.cap h3{margin:0;font-size:15px;font-weight:600;line-height:1.25;text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.cap p{margin:2px 0 0;font-size:12.5px;color:rgba(243,238,232,.75)}
+.pbtn{flex:none;width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.14);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.3);color:var(--fg);transition:background .3s,color .3s,transform .3s}
+.card:hover .pbtn{background:var(--accent);color:var(--ink);border-color:var(--accent);transform:scale(1.1)}
+
+/* featured case */
+.feature{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:clamp(20px,4vw,56px);align-items:center;margin-bottom:40px;padding:clamp(16px,3vw,32px);border:1px solid var(--line);border-radius:14px;background:radial-gradient(120% 120% at 100% 0%,rgba(255,159,74,.12),transparent 55%),var(--panel)}
+.feature .card .frame{max-width:340px;margin-inline:auto}
+.feature .kicker{font-family:var(--f-mono);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);margin:0 0 14px}
+.feature .ftxt h3{font-family:var(--f-display);font-weight:800;font-size:clamp(24px,3.2vw,40px);line-height:1.05;margin:0 0 16px;letter-spacing:-.02em;text-wrap:balance}
+.feature .ftxt p{color:var(--muted);margin:0 0 18px;max-width:32em}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips span{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.04em;border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+
+.pair{display:grid;grid-template-columns:minmax(0,.42fr) minmax(0,1fr);gap:24px;align-items:start}
+
+/* footer */
+footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-block:80px 64px;overflow:hidden}
+.big{display:block;font-family:var(--f-display);font-weight:900;text-transform:uppercase;font-size:clamp(40px,10vw,150px);line-height:.9;letter-spacing:-.04em;text-decoration:none;margin-bottom:40px}
+.big span{display:block;color:transparent;-webkit-text-stroke:1.5px var(--fg);transition:color .4s,-webkit-text-stroke-color .4s}
+.big:hover span{color:var(--accent);-webkit-text-stroke-color:var(--accent)}
+.contacts{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center;color:var(--muted);font-family:var(--f-mono);font-size:13px}
+.contacts b{color:var(--fg);font-weight:500}
+
+/* lightbox */
+.lb[hidden]{display:none}
+.lb{position:fixed;inset:0;z-index:80;background:rgba(8,7,9,.94);backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:calc(56px + env(safe-area-inset-top,0px)) 16px calc(24px + env(safe-area-inset-bottom,0px))}
+.lb video{max-width:min(100%,1100px);max-height:calc(100% - 70px);border-radius:10px;background:#000;box-shadow:0 30px 90px rgba(0,0,0,.7)}
+.lb-meta{display:flex;align-items:center;gap:16px;font-family:var(--f-mono);font-size:13px;color:var(--muted);text-align:center}
+.lb-meta b{color:var(--fg);font-family:var(--f-body);font-size:15px;font-weight:600}
+.lb button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:var(--fg);border-radius:999px;cursor:pointer;font:inherit}
+.lb .x{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:16px;width:44px;height:44px;font-size:20px}
+.lb .nav{width:40px;height:40px}
+.lb button:hover{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+
+/* cursor */
+.cursor{position:fixed;left:0;top:0;z-index:90;width:14px;height:14px;border-radius:50%;background:var(--accent);pointer-events:none;transform:translate(-50%,-50%);mix-blend-mode:difference;transition:width .3s,height .3s,background .3s;display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;color:transparent}
+.cursor.on{width:74px;height:74px;background:var(--fg);color:#000;mix-blend-mode:normal}
+
+@media (hover:none),(pointer:coarse){.cursor,.glow{display:none}}
+@media (max-width:980px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:860px){
+  .hero,.about,.feature,.pair{grid-template-columns:1fr}
+  .bar nav{display:none}
+  .stack{height:clamp(360px,100vw,520px);max-width:520px}
+  .portrait{max-width:420px}
+  .grid,.grid.three{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+  .ch-head{grid-template-columns:auto minmax(0,1fr)}
+  .ch-tc{display:none}
+  .pair .card .frame{max-width:340px}
+}
+@media (max-width:480px){
+  .steps{grid-template-columns:1fr}
+  .cap h3{font-size:13.5px}.cap p{display:none}
+  .pbtn{width:34px;height:34px}
+  .stack .badge{width:92px;height:92px;font-size:11px}
+}
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation:none!important;transition:none!important}
+  .phone video{display:none}
+}
+</style>
+<style>body{margin:0}[hidden]{display:none!important}img{max-width:100%}</style>
+</head>
+<body>
+
+
+<div class="grain" aria-hidden="true"></div>
+<div class="glow" aria-hidden="true"></div>
+<div class="cursor" aria-hidden="true">PLAY</div>
+
+<header class="bar">
+  <div class="wrap">
+    <span class="rec"><i></i>REC <span class="tcode" id="tc">00:00:00:00</span></span>
+    <nav aria-label="Разделы">
+      <a href="#brands">Реклама</a>
+      <a href="#cartoons">Мультфильмы</a>
+      <a href="#avatar">Аватары</a>
+      <a href="#contact">Контакты</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <p class="eyebrow">AI Video Creator</p>
+      <h1 aria-label="Елена Кузнецова"><span class="line" data-split>Елена</span><span class="line outline" data-split>Кузнецова</span></h1>
+      <p class="role">Создаю <b>рекламные ролики, AI-мультфильмы и цифровых аватаров</b> для брендов и людей</p>
+      <p class="lede">Веду проект целиком: сценарий, персонажи, генерация, монтаж и звук. Героев держу узнаваемыми от кадра к кадру, поэтому могу делать целые сериалы.</p>
+      <div class="cta">
+        <a class="btn primary" href="#brands">Смотреть работы <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" fill="none"/></svg></a>
+        <a class="btn" href="https://t.me/eyuk160" target="_blank" rel="noopener">Telegram</a>
+      </div>
+    </div>
+    <div class="stack" aria-hidden="true">
+      <div class="phone p1" data-tag="Мультсериал"><video src="v/loop-a.mp4" poster="v/store.jpg" muted autoplay loop playsinline></video></div>
+      <div class="phone p2" data-tag="Реклама"><video src="v/loop-b.mp4" poster="v/bike.jpg" muted autoplay loop playsinline></video></div>
+      <div class="phone p3" data-tag="Мультфильм"><video src="v/loop-c.mp4" poster="v/key.jpg" muted autoplay loop playsinline></video></div>
+      <div class="badge"><svg viewBox="0 0 116 116"><defs><path id="c" d="M58,58 m-46,0 a46,46 0 1,1 92,0 a46,46 0 1,1 -92,0"/></defs><text><textPath href="#c">AI video · showreel 2026 · AI video · showreel ·</textPath></text></svg>AI<br>VIDEO</div>
+    </div>
+  </section>
+</main>
+
+<div class="mq-clip"><div class="marquee" aria-hidden="true">
+  <div class="track">
+    <span>Реклама брендов <em>✦</em> AI-мультфильмы <em>✦</em> Цифровые аватары <em>✦</em> Персональные клипы <em>✦</em></span>
+    <span>Реклама брендов <em>✦</em> AI-мультфильмы <em>✦</em> Цифровые аватары <em>✦</em> Персональные клипы <em>✦</em></span>
+  </div>
+</div></div>
+
+<div class="wrap">
+  <section class="about">
+    <figure class="portrait">
+      <img src="v/elena.jpg" alt="Елена Кузнецова">
+      <figcaption><i></i>ЕЛЕНА · AI CREATOR</figcaption>
+    </figure>
+    <div>
+      <p class="eyebrow">Как я работаю</p>
+      <h2>Из идеи в готовое видео без съёмочной группы</h2>
+      <p>Беру задачу бренда или заказчика и превращаю её в ролик под нужную площадку: маркетплейс, сайт, соцсети, большой экран.</p>
+      <div class="steps">
+        <div class="step"><i>01 — сценарий</i><h3>Сюжет и раскадровка</h3><p>Разбираю задачу, пишу историю под формат и хронометраж.</p></div>
+        <div class="step"><i>02 — персонажи</i><h3>Герои и локации</h3><p>Создаю постоянных персонажей и держу их узнаваемыми.</p></div>
+        <div class="step"><i>03 — генерация</i><h3>Сцены и движение</h3><p>Собираю кадры в видеомоделях, добиваюсь эмоций и пластики.</p></div>
+        <div class="step"><i>04 — пост</i><h3>Монтаж и звук</h3><p>Музыка, озвучка, титры. Отдаю в 9:16 и 16:9.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="chapter" id="brands">
+    <div class="ch-head"><span class="ch-num">01</span><div><h2>Реклама брендов</h2><p>Продуктовые и fashion-ролики: товар крупно, детали, атмосфера бренда.</p></div><span class="ch-tc" data-tc="bike,bag,shirt,stool"></span></div>
+    <div class="grid" data-clips="bike,bag,shirt,stool"></div>
+  </section>
+
+  <section class="chapter" id="cartoons">
+    <div class="ch-head"><span class="ch-num">02</span><div><h2>AI-мультфильмы</h2><p>Коммерческие сериалы с постоянными героями и сюжетные мультики.</p></div><span class="ch-tc" data-tc="med,train,store,plane,xmas,key,hair"></span></div>
+    <div class="feature">
+      <div data-clips="med"></div>
+      <div class="ftxt">
+        <p class="kicker">Кейс · коммерческий мультсериал</p>
+        <h3>Мультсериал для медцентра «МЫ»</h3>
+        <p>Серия роликов, где герои проживают ситуации, с которыми семьи приходят в центр. Мультфильм объясняет услугу через историю, а не через рекламу в лоб.</p>
+        <div class="chips"><span>3 серии</span><span>постоянные персонажи</span><span>брендинг заказчика</span><span>9:16</span></div>
+      </div>
+    </div>
+    <div class="grid three" data-clips="train,store,plane,xmas,key,hair"></div>
+  </section>
+
+  <section class="chapter" id="avatar">
+    <div class="ch-head"><span class="ch-num">03</span><div><h2>Аватары и реализм</h2><p>Цифровой ведущий для сайта и персональный фильм-поздравление.</p></div><span class="ch-tc" data-tc="avatar,court"></span></div>
+    <div class="pair"><div data-clips="avatar"></div><div data-clips="court"></div></div>
+  </section>
+</div>
+
+<footer id="contact">
+  <div class="wrap">
+    <p class="eyebrow">Новый проект</p>
+    <a class="big" href="https://t.me/eyuk160" target="_blank" rel="noopener">Давайте<span>снимем</span></a>
+    <div class="contacts">
+      <span>Telegram <b>@eyuk160</b></span>
+      <a href="https://www.instagram.com/elena_ai_creator_for_brands/" target="_blank" rel="noopener">Instagram <b>@elena_ai_creator_for_brands</b></a>
+      <span>© 2026 Елена Кузнецова</span>
+    </div>
+  </div>
+</footer>
+
+<div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Просмотр ролика">
+  <button class="x" type="button" id="lbx" aria-label="Закрыть">✕</button>
+  <video id="lbv" controls playsinline></video>
+  <div class="lb-meta">
+    <button class="nav" type="button" id="lbp" aria-label="Предыдущий">←</button>
+    <div><b id="lbt"></b><br><span id="lbs"></span></div>
+    <button class="nav" type="button" id="lbn" aria-label="Следующий">→</button>
+  </div>
+</div>
+
+<script>
+(function(){
+var C={
+  bike:{t:"Реклама велосипеда",s:"Детали узлов и катание в движении",tag:"Продукт",d:30},
+  bag:{t:"Пакет из бутика",s:"Кинематографичный fashion-сюжет",tag:"Fashion",d:12},
+  shirt:{t:"Лукбук рубашки",s:"Модель, локация и принт без съёмки",tag:"Fashion",d:14},
+  stool:{t:"Детский стульчик",s:"Студийная предметка для карточки",tag:"Предметка",d:14},
+  med:{t:"Медцентр «МЫ» · серия 2",s:"Коммерческий мультсериал",tag:"Кейс",d:101},
+  train:{t:"В поезде",s:"Серия 1",tag:"Сериал",d:29},
+  store:{t:"Истерика в магазине",s:"Серия 2",tag:"Сериал",d:33},
+  plane:{t:"В самолёте",s:"Серия 3",tag:"Сериал",d:24},
+  xmas:{t:"Новогодние подарки",s:"Праздничная история",tag:"Мультфильм",d:36},
+  key:{t:"Ключ от двери",s:"Приключение в волшебный мир",tag:"Мультфильм",d:15},
+  hair:{t:"Укладка и дождь",s:"Комедийная мини-история",tag:"Мультфильм",d:15},
+  avatar:{t:"Говорящий аватар для сайта",s:"Липсинк и живая мимика",tag:"Аватар",d:104},
+  court:{t:"Юбилейный клип «Судебная драма»",s:"Именинник стал героем криминальной драмы",tag:"Персональный клип · 16:9",d:263,wide:1}
+};
+function fmt(s){var m=Math.floor(s/60),r=s%60;return m+':'+(r<10?'0':'')+r}
+var order=[];
+document.querySelectorAll('[data-clips]').forEach(function(box){
+  box.getAttribute('data-clips').split(',').forEach(function(k){
+    var c=C[k];order.push(k);
+    var f=document.createElement('figure');f.className='card'+(c.wide?' wide':'');f.tabIndex=0;f.setAttribute('role','button');f.setAttribute('aria-label','Смотреть: '+c.t);f.dataset.k=k;
+    f.innerHTML='<div class="frame"><img src="v/'+k+'.jpg" alt=""><video muted loop playsinline preload="none" data-src="v/p-'+k+'.mp4"></video><div class="scan"></div>'+
+      '<span class="tag">'+c.tag+'</span><span class="dur">'+fmt(c.d)+'</span>'+
+      '<figcaption class="cap"><div><h3>'+c.t+'</h3><p>'+c.s+'</p></div><span class="pbtn" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 1.8v10.4L12 7z" fill="currentColor"/></svg></span></figcaption></div>';
+    box.appendChild(f);
+  });
+});
+document.querySelectorAll('[data-tc]').forEach(function(el){
+  var n=el.getAttribute('data-tc').split(','),s=n.reduce(function(a,k){return a+C[k].d},0);
+  el.textContent=n.length+' ролик'+(n.length>4?'ов':n.length>1?'а':'')+' · '+fmt(s);
+});
+
+/* split title letters */
+document.querySelectorAll('[data-split]').forEach(function(el){
+  var t=el.textContent;el.textContent='';
+  t.split('').forEach(function(ch,i){var s=document.createElement('span');s.className='ch';s.style.setProperty('--i',i);s.textContent=ch;el.appendChild(s)});
+});
+
+/* REC timecode */
+var t0=performance.now(),tc=document.getElementById('tc');
+function p2(n){return(n<10?'0':'')+n}
+(function tick(){var e=(performance.now()-t0)/1000,h=Math.floor(e/3600),m=Math.floor(e/60)%60,s=Math.floor(e)%60,f=Math.floor((e%1)*24);tc.textContent=p2(h)+':'+p2(m)+':'+p2(s)+':'+p2(f);requestAnimationFrame(tick)})();
+
+var fine=matchMedia('(hover:hover) and (pointer:fine)').matches;
+var reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
+var cards=[].slice.call(document.querySelectorAll('.card'));
+
+/* hover previews + tilt */
+cards.forEach(function(card){
+  var v=card.querySelector('video'),fr=card.querySelector('.frame');
+  function on(){if(!v.src)v.src=v.dataset.src;var p=v.play();if(p)p.then(function(){card.classList.add('hot')}).catch(function(){})}
+  function off(){card.classList.remove('hot');v.pause();fr.style.transform=''}
+  if(fine){
+    card.addEventListener('mouseenter',on);card.addEventListener('mouseleave',off);
+    if(!reduce)card.addEventListener('mousemove',function(e){var r=fr.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;fr.style.transform='perspective(900px) rotateY('+(x*8)+'deg) rotateX('+(-y*8)+'deg) translateY(-4px)'});
+  }
+  card.addEventListener('click',function(){openLB(card.dataset.k)});
+  card.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();openLB(card.dataset.k)}});
+});
+
+/* scan sweep when a card enters; on touch screens, previews play while in view */
+if('IntersectionObserver' in window){
+  var io=new IntersectionObserver(function(es){es.forEach(function(e){
+    var c=e.target,v=c.querySelector('video');
+    if(e.isIntersecting){c.classList.add('seen');if(!fine&&!reduce){if(!v.src)v.src=v.dataset.src;var p=v.play();if(p)p.then(function(){c.classList.add('hot')}).catch(function(){})}}
+    else if(!fine){v.pause();c.classList.remove('hot')}
+  })},{threshold:.55});
+  cards.forEach(function(c){io.observe(c)});
+}
+
+/* lightbox */
+var lb=document.getElementById('lb'),lbv=document.getElementById('lbv'),cur=0;
+function openLB(k){cur=order.indexOf(k);show();lb.hidden=false;document.body.style.overflow='hidden';document.getElementById('lbx').focus()}
+function show(){var k=order[cur],c=C[k];lbv.src='v/'+k+'.mp4';lbv.poster='v/'+k+'.jpg';document.getElementById('lbt').textContent=c.t;document.getElementById('lbs').textContent=c.tag+' · '+fmt(c.d);var p=lbv.play();if(p)p.catch(function(){})}
+function close(){lbv.pause();lbv.removeAttribute('src');lbv.load();lb.hidden=true;document.body.style.overflow=''}
+document.getElementById('lbx').onclick=close;
+document.getElementById('lbn').onclick=function(){cur=(cur+1)%order.length;show()};
+document.getElementById('lbp').onclick=function(){cur=(cur-1+order.length)%order.length;show()};
+lb.addEventListener('click',function(e){if(e.target===lb)close()});
+addEventListener('keydown',function(e){if(lb.hidden)return;if(e.key==='Escape')close();if(e.key==='ArrowRight')document.getElementById('lbn').click();if(e.key==='ArrowLeft')document.getElementById('lbp').click()});
+
+/* cursor + glow + hero parallax */
+if(fine&&!reduce){
+  var cu=document.querySelector('.cursor'),gl=document.querySelector('.glow'),x=innerWidth/2,y=innerHeight/2,cx=x,cy=y;
+  addEventListener('mousemove',function(e){x=e.clientX;y=e.clientY;cu.classList.toggle('on',!!e.target.closest('.card'))});
+  var phones=[].slice.call(document.querySelectorAll('.phone'));
+  (function loop(){cx+=(x-cx)*.18;cy+=(y-cy)*.18;cu.style.transform='translate('+(cx-cu.offsetWidth/2)+'px,'+(cy-cu.offsetHeight/2)+'px)';gl.style.transform='translate('+(x-280)+'px,'+(y-280)+'px)';
+    var dx=(x/innerWidth-.5),dy=(y/innerHeight-.5);phones.forEach(function(p,i){p.style.marginLeft=(dx*(i+1)*-12)+'px';p.style.marginTop=(dy*(i+1)*-10)+'px'});
+    requestAnimationFrame(loop)})();
+  cu.style.left='0';cu.style.top='0';
+}
+})();
+</script>
+
+</body>
+</html>
