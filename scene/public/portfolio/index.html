@@ -361,6 +361,22 @@ document.querySelectorAll('[data-split]').forEach(function(el){
   t.split('').forEach(function(ch,i){var s=document.createElement('span');s.className='ch';s.style.setProperty('--i',i);s.textContent=ch;el.appendChild(s)});
 });
 
+/* fit the title to its column using the real rendered width */
+var h1=document.querySelector('h1');
+function fitTitle(){
+  h1.style.fontSize='';
+  var lines=[].slice.call(h1.querySelectorAll('.line'));
+  var col=lines[0].clientWidth, widest=0;
+  lines.forEach(function(l){var r=document.createRange();r.selectNodeContents(l);widest=Math.max(widest,r.getBoundingClientRect().width)});
+  var fs=parseFloat(getComputedStyle(h1).fontSize);
+  if(widest>col*0.92){h1.style.fontSize=Math.floor(fs*col*0.92/widest)+'px'}
+}
+fitTitle();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitTitle);
+addEventListener('load',fitTitle);
+var rt;addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(fitTitle,100)});
+setTimeout(fitTitle,1200);
+
 /* REC timecode */
 var t0=performance.now(),tc=document.getElementById('tc');
 function p2(n){return(n<10?'0':'')+n}
