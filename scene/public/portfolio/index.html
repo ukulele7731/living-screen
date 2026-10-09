@@ -159,6 +159,7 @@ h1 .line:nth-child(1) .ch{animation-delay:calc(var(--i)*.035s)}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chips span{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.04em;border:1px solid var(--line);border-radius:999px;padding:6px 12px}
 
+.wide-one{margin-top:24px}
 .pair{display:grid;grid-template-columns:minmax(0,.42fr) minmax(0,1fr);gap:24px;align-items:start}
 
 /* footer */
@@ -296,8 +297,9 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
   </section>
 
   <section class="chapter" id="avatar">
-    <div class="ch-head"><span class="ch-num">03</span><div><h2>Аватары и реализм</h2><p>Цифровой ведущий для сайта и персональный фильм-поздравление.</p></div><span class="ch-tc" data-tc="avatar,court"></span></div>
-    <div class="pair"><div data-clips="avatar"></div><div data-clips="court"></div></div>
+    <div class="ch-head"><span class="ch-num">03</span><div><h2>Аватары и реализм</h2><p>Цифровой ведущий, фотореалистичные сцены и персональный фильм-поздравление.</p></div><span class="ch-tc" data-tc="avatar,bridge,outfit,court"></span></div>
+    <div class="grid three" data-clips="avatar,bridge,outfit"></div>
+    <div class="wide-one" data-clips="court"></div>
   </section>
 </div>
 
@@ -342,6 +344,8 @@ var C={
   key:{t:"Ключ от двери",s:"Приключение в волшебный мир",tag:"Мультфильм",d:15},
   hair:{t:"Укладка и дождь",s:"Комедийная мини-история",tag:"Мультфильм",d:15},
   avatar:{t:"Говорящий аватар для сайта",s:"Липсинк и живая мимика",tag:"Аватар",d:104},
+  bridge:{t:"Мост в горах",s:"Реалистичный пролёт камеры",tag:"Реализм",d:26},
+  outfit:{t:"Смена образов",s:"Четыре лука в одном кадре",tag:"Fashion · реализм",d:15},
   court:{t:"Юбилейный клип «Судебная драма»",s:"Именинник стал героем криминальной драмы",tag:"Персональный клип · 16:9",d:263,wide:1}
 };
 function fmt(s){var m=Math.floor(s/60),r=s%60;return m+':'+(r<10?'0':'')+r}
