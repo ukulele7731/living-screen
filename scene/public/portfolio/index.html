@@ -170,6 +170,22 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
 .contacts{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;align-items:center;color:var(--muted);font-family:var(--f-mono);font-size:13px}
 .contacts b{color:var(--fg);font-weight:500}
 
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:28px}
+.kpi{background:var(--panel);padding:20px 18px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi b{font-family:var(--f-display);font-weight:800;font-size:clamp(22px,2.6vw,34px);line-height:1.05;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi.hl{background:radial-gradient(120% 140% at 0% 0%,rgba(255,159,74,.22),transparent 60%),var(--panel)}
+.kpi.hl b{color:var(--accent)}
+.kpi.sm b{font-size:clamp(18px,2vw,24px)}
+.kpi span{font-size:13px;color:var(--muted)}
+.shots-head{margin:32px 0 14px;font-family:var(--f-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.shots{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px}
+.shot{position:relative;padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;cursor:zoom-in;transition:transform .3s,border-color .3s}
+.shot:hover{transform:translateY(-3px);border-color:var(--accent)}
+.shot img{display:block;width:100%;aspect-ratio:9/13;object-fit:cover;object-position:50% 38%}
+.shot span{position:absolute;left:8px;bottom:8px;font-family:var(--f-mono);font-size:11px;background:rgba(15,13,17,.8);color:var(--fg);padding:3px 8px;border-radius:3px}
+.lbi img{max-width:min(100%,520px);max-height:100%;border-radius:10px;object-fit:contain}
+@media (max-width:860px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.shots{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+
 /* lightbox */
 .lb[hidden]{display:none}
 .lb{position:fixed;inset:0;z-index:80;background:rgba(8,7,9,.94);backdrop-filter:blur(10px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:calc(56px + env(safe-area-inset-top,0px)) 16px calc(24px + env(safe-area-inset-bottom,0px))}
@@ -222,6 +238,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
   <div class="wrap">
     <span class="rec"><i></i>REC <span class="tcode" id="tc">00:00:00:00</span></span>
     <nav aria-label="Разделы">
+      <a href="#series">Сериал</a>
       <a href="#brands">Реклама</a>
       <a href="#cartoons">Мультфильмы</a>
       <a href="#avatar">Аватары</a>
@@ -238,7 +255,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
       <p class="role">Создаю <b>рекламные ролики, AI-мультфильмы и цифровых аватаров</b> для брендов и людей</p>
       <p class="lede">Веду проект целиком: сценарий, персонажи, генерация, монтаж и звук. Героев держу узнаваемыми от кадра к кадру, поэтому могу делать целые сериалы.</p>
       <div class="cta">
-        <a class="btn primary" href="#brands">Смотреть работы <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" fill="none"/></svg></a>
+        <a class="btn primary" href="#series">Смотреть работы <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 8h11M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.8" fill="none"/></svg></a>
         <a class="btn" href="https://t.me/eyuk160" target="_blank" rel="noopener">Telegram</a>
       </div>
     </div>
@@ -253,8 +270,8 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
 
 <div class="mq-clip"><div class="marquee" aria-hidden="true">
   <div class="track">
-    <span>Реклама брендов <em>✦</em> AI-мультфильмы <em>✦</em> Цифровые аватары <em>✦</em> Персональные клипы <em>✦</em></span>
-    <span>Реклама брендов <em>✦</em> AI-мультфильмы <em>✦</em> Цифровые аватары <em>✦</em> Персональные клипы <em>✦</em></span>
+    <span>AI-сериалы <em>✦</em> Реклама брендов <em>✦</em> AI-мультфильмы <em>✦</em> Цифровые аватары <em>✦</em> Персональные клипы <em>✦</em></span>
+    <span>AI-сериалы <em>✦</em> Реклама брендов <em>✦</em> AI-мультфильмы <em>✦</em> Цифровые аватары <em>✦</em> Персональные клипы <em>✦</em></span>
   </div>
 </div></div>
 
@@ -277,13 +294,35 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
     </div>
   </section>
 
+  <section class="chapter" id="series">
+    <div class="ch-head"><span class="ch-num">01</span><div><h2>Сериал «Записки домохозяйки»</h2><p>Драматический сериал в стиле AI-реализма для собственного Instagram. Без рекламного бюджета.</p></div><span class="ch-tc" data-tc="zap1,zap2,zap3,zap4"></span></div>
+    <div class="kpis">
+      <div class="kpi hl"><b>1 063 901</b><span>просмотр за 4 серии</span></div>
+      <div class="kpi"><b>883 713</b><span>просмотров у лучшей серии</span></div>
+      <div class="kpi"><b>+1 320</b><span>подписчиков</span></div>
+      <div class="kpi"><b>326 457</b><span>уникальных зрителей</span></div>
+      <div class="kpi sm"><b>12 900</b><span>лайков</span></div>
+      <div class="kpi sm"><b>877</b><span>отправок</span></div>
+      <div class="kpi sm"><b>765</b><span>сохранений</span></div>
+      <div class="kpi sm"><b>321</b><span>комментарий</span></div>
+    </div>
+    <div class="grid" data-clips="zap1,zap2,zap3,zap4"></div>
+    <div class="shots-head">Статистика Instagram · нажмите, чтобы увеличить</div>
+    <div class="shots">
+      <button type="button" class="shot" data-img="v/stat1.jpg"><img src="v/stat1.jpg" alt="Статистика серии 1: 883 713 просмотров"><span>Серия 1</span></button>
+      <button type="button" class="shot" data-img="v/stat2.jpg"><img src="v/stat2.jpg" alt="Статистика серии 2: 26 281 просмотр"><span>Серия 2</span></button>
+      <button type="button" class="shot" data-img="v/stat3.jpg"><img src="v/stat3.jpg" alt="Статистика серии 3: 116 527 просмотров"><span>Серия 3</span></button>
+      <button type="button" class="shot" data-img="v/stat4.jpg"><img src="v/stat4.jpg" alt="Статистика серии 4: 37 380 просмотров"><span>Серия 4</span></button>
+    </div>
+  </section>
+
   <section class="chapter" id="brands">
-    <div class="ch-head"><span class="ch-num">01</span><div><h2>Реклама брендов</h2><p>Продуктовые и fashion-ролики, UGC и мультреклама: товар крупно, детали, атмосфера бренда.</p></div><span class="ch-tc" data-tc="vitform,insurance,bike,bag,shirt,stool,mattress,razor"></span></div>
+    <div class="ch-head"><span class="ch-num">02</span><div><h2>Реклама брендов</h2><p>Продуктовые и fashion-ролики, UGC и мультреклама: товар крупно, детали, атмосфера бренда.</p></div><span class="ch-tc" data-tc="vitform,insurance,bike,bag,shirt,stool,mattress,razor"></span></div>
     <div class="grid" data-clips="vitform,insurance,bike,bag,shirt,stool,mattress,razor"></div>
   </section>
 
   <section class="chapter" id="cartoons">
-    <div class="ch-head"><span class="ch-num">02</span><div><h2>AI-мультфильмы</h2><p>Коммерческие сериалы с постоянными героями и сюжетные мультики.</p></div><span class="ch-tc" data-tc="med1,med,med3,train,store,plane,xmas,key,hair"></span></div>
+    <div class="ch-head"><span class="ch-num">03</span><div><h2>AI-мультфильмы</h2><p>Коммерческие сериалы с постоянными героями и сюжетные мультики.</p></div><span class="ch-tc" data-tc="med1,med,med3,train,store,plane,xmas,key,hair"></span></div>
     <div class="feature">
       <div class="fgrid" data-clips="med1,med,med3"></div>
       <div class="ftxt">
@@ -297,7 +336,7 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
   </section>
 
   <section class="chapter" id="avatar">
-    <div class="ch-head"><span class="ch-num">03</span><div><h2>Аватары и реализм</h2><p>Цифровой ведущий, фотореалистичные сцены и персональный фильм-поздравление.</p></div><span class="ch-tc" data-tc="avatar,bridge,outfit,court"></span></div>
+    <div class="ch-head"><span class="ch-num">04</span><div><h2>Аватары и реализм</h2><p>Цифровой ведущий, фотореалистичные сцены и персональный фильм-поздравление.</p></div><span class="ch-tc" data-tc="avatar,bridge,outfit,court"></span></div>
     <div class="grid three" data-clips="avatar,bridge,outfit"></div>
     <div class="wide-one" data-clips="court"></div>
   </section>
@@ -315,6 +354,11 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
   </div>
 </footer>
 
+<div class="lb lbi" id="lbi" hidden role="dialog" aria-modal="true" aria-label="Скриншот статистики">
+  <button class="x" type="button" id="lbix" aria-label="Закрыть">✕</button>
+  <img id="lbimg" alt="">
+</div>
+
 <div class="lb" id="lb" hidden role="dialog" aria-modal="true" aria-label="Просмотр ролика">
   <button class="x" type="button" id="lbx" aria-label="Закрыть">✕</button>
   <video id="lbv" controls playsinline></video>
@@ -328,6 +372,10 @@ footer{position:relative;z-index:1;border-top:1px solid var(--line);padding-bloc
 <script>
 (function(){
 var C={
+  zap1:{t:"Серия 1 · Невидимка",s:"883 713 просмотров",tag:"Серия 1",d:28},
+  zap2:{t:"Серия 2 · Две тысячи",s:"26 281 просмотр",tag:"Серия 2",d:30},
+  zap3:{t:"Серия 3 · Чек",s:"116 527 просмотров",tag:"Серия 3",d:36},
+  zap4:{t:"Серия 4 · Для мамы",s:"37 380 просмотров",tag:"Серия 4",d:43},
   bike:{t:"Реклама велосипеда",s:"Детали узлов и катание в движении",tag:"Продукт",d:30},
   bag:{t:"Пакет из бутика",s:"Кинематографичный fashion-сюжет",tag:"Fashion",d:12},
   shirt:{t:"Лукбук рубашки",s:"Модель, локация и принт без съёмки",tag:"Fashion",d:14},
@@ -388,6 +436,14 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitTitle);
 addEventListener('load',fitTitle);
 var rt;addEventListener('resize',function(){clearTimeout(rt);rt=setTimeout(fitTitle,100)});
 setTimeout(fitTitle,1200);
+
+/* stats screenshots */
+var lbi=document.getElementById('lbi'),lbimg=document.getElementById('lbimg');
+[].forEach.call(document.querySelectorAll('.shot'),function(b){b.addEventListener('click',function(){lbimg.src=b.dataset.img;lbimg.alt=b.querySelector('img').alt;lbi.hidden=false;document.body.style.overflow='hidden';document.getElementById('lbix').focus()})});
+function closeI(){lbi.hidden=true;document.body.style.overflow=''}
+document.getElementById('lbix').onclick=closeI;
+lbi.addEventListener('click',function(e){if(e.target===lbi)closeI()});
+addEventListener('keydown',function(e){if(!lbi.hidden&&e.key==='Escape')closeI()});
 
 /* REC timecode */
 var t0=performance.now(),tc=document.getElementById('tc');
